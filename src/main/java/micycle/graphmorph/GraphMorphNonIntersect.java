@@ -28,8 +28,16 @@ import java.awt.event.MouseMotionListener;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.util.Arrays;
 
+/**
+ * Intersection-Free Morphing of Planar Graphs
+ * <p>
+ * The algorithm uses a combination of different techniques to achieve smooth
+ * transformations: rigid morphing, compatible triangulations, as well as
+ * morphing based on interpolation of the convex representations of the graphs;
+ * the algorithm can morph between drawings with straight-line segments, bends,
+ * and curves
+ */
 class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotionListener, AdjustmentListener, ItemListener, ActionListener {
 
 	final int SIZE = 20;
@@ -77,10 +85,19 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 	boolean animateMode;
 	boolean doAnimate;
 	boolean changed;
+	/**
+	 * ID (0 or 1) of the currently selected graph.
+	 */
 	int curGraph;
 	int[] curNode;
 	int[][] nodeID;
+	/**
+	 * X position of node n in graph g: [g][n] = x
+	 */
 	int[][] nodeX;
+	/**
+	 * Y position of node n in graph g: [g][n] = y
+	 */
 	int[][] nodeY;
 	int arcStart;
 	int[][] aNodeX;
@@ -92,6 +109,10 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 	int downY;
 	int downNode;
 	int[] nodeCount;
+	/**
+	 * id of nodes 1 and 2 which are connected by edge e in graph g: [g][e][0] =
+	 * ID1; [g][e][1] = ID2
+	 */
 	int[][][] link;
 	int[] curLink;
 	Animation t;
@@ -105,23 +126,14 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 	boolean down;
 	Choice ch;
 	Choice bound;
-	double a11;
-	double a12;
-	double a13;
-	double a21;
-	double a22;
-	double a23;
-	double q11;
-	double q12;
-	double q21;
-	double q22;
+	double a13, a23;
 	double s11;
 	double s12;
 	double s21;
 	double s22;
 	double rtheta;
-	double cx;
-	double cy;
+	double centerX;
+	double centerY;
 	FontMetrics fm;
 	double[][] lamda0;
 	double[][] lamda1;
@@ -135,7 +147,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 	int[][] extraNodes;
 	int extraNodeCount;
 	Checkbox showSteiner;
-	Button findPolygon;
+	Button triangulateButton;
 	Button save;
 	Button open;
 	GraphMorph ref;
@@ -267,7 +279,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.bound.select(0);
 		(this.showSteiner = new Checkbox("Show Steiner points")).setState(true);
 		this.showSteiner.addItemListener(this);
-		(this.findPolygon = new Button("Triangulate")).addActionListener(this);
+		(this.triangulateButton = new Button("Triangulate")).addActionListener(this);
 		(this.save = new Button("Save File")).addActionListener(this);
 		(this.open = new Button("Load File")).addActionListener(this);
 		this.setLayout(null);
@@ -300,7 +312,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.addToPanel(this.framesText, 900, 530, 40, 20);
 		this.addToPanel(this.ch, 860, 195, 80, 20);
 		this.addToPanel(this.bound, 860, 125, 80, 20);
-		this.addToPanel(this.findPolygon, 750, 125, 80, 20);
+		this.addToPanel(this.triangulateButton, 750, 125, 80, 20);
 		this.addToPanel(this.showSteiner, 750, 160, 150, 20);
 		this.addToPanel(this.save, 670, 240, 100, 20);
 		this.addToPanel(this.open, 820, 240, 100, 20);
@@ -578,18 +590,28 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		graphics.dispose();
 	}
 
-	int getNode(final int n, final int n2) {
+	/**
+	 * Given a screen x and y coordinate, this method returns the index of the node
+	 * located at that coordinate in the current graph. If there is no node located
+	 * at the given coordinate, it returns -1.
+	 *
+	 * @param x The x coordinate of the point on the screen
+	 * @param y The y coordinate of the point on the screen
+	 * @return The index of the node located at the given screen coordinates or -1
+	 *         if there is no node located at the given coordinates.
+	 */
+	private int getNode(final int x, final int y) {
 		for (int i = 0; i < this.curNode[this.curGraph]; ++i) {
-			final int n3 = this.nodeX[this.curGraph][i] - 10 + 10;
-			final int n4 = this.nodeY[this.curGraph][i] - 10 + 10;
-			if (n > n3 && n < n3 + 20 && n2 > n4 && n2 < n4 + 20) {
+			final int nodeX = this.nodeX[this.curGraph][i] - 10 + 10;
+			final int nodeY = this.nodeY[this.curGraph][i] - 10 + 10;
+			if (x > nodeX && x < nodeX + 20 && y > nodeY && y < nodeY + 20) {
 				return i;
 			}
 		}
 		return -1;
 	}
 
-	void eraseNode(final Graphics graphics, final int n, final int n2) {
+	private void eraseNode(final Graphics graphics, final int n, final int n2) {
 		if (this.animateMode) {
 			return;
 		}
@@ -705,8 +727,9 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 			graphics4.dispose();
 		}
 	}
+	
 
-	void drawArc(final Graphics graphics, int n, int n2) {
+	private void drawArc(final Graphics graphics, int n, int n2) {
 		boolean b = false;
 		n -= 10;
 		n2 -= 10;
@@ -847,7 +870,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 			graphics.drawImage(this.bi, 10, 10, this);
 			graphics2.dispose();
 			graphics.dispose();
-		} else if (button == this.findPolygon) {
+		} else if (button == this.triangulateButton) {
 			int n = 1000;
 			this.extraNodeCount = 0;
 			this.addBoundary();
@@ -866,7 +889,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void addBoundary() {
+	private void addBoundary() {
 		final int n = this.curNode[0];
 		int n3;
 		int n2 = n3 = this.nodeX[0][0];
@@ -968,12 +991,12 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		int m = 0;
 		for (int n14 = 0; n14 < 4; ++n14) {
 			for (l = 0; l < n; ++l) {
-				if (!this.edgeCross(array[n14], array2[n14], this.nodeX[0][l], this.nodeY[0][l], 0, l)) {
+				if (!this.edgeCross(array[n14], array2[n14], this.nodeX[0][l], this.nodeY[0][l], 0)) {
 					array5[n14][l] = Math.sqrt((this.nodeX[0][l] - array[n14]) * (this.nodeX[0][l] - array[n14])
 							+ (this.nodeY[0][l] - array2[n14]) * (this.nodeY[0][l] - array2[n14]));
 					for (m = 0; m < 4; ++m) {
 						for (int n15 = 0; n15 < n; ++n15) {
-							if (!this.edgeCross(array3[m], array4[m], this.nodeX[1][n15], this.nodeY[1][n15], 1, n15)) {
+							if (!this.edgeCross(array3[m], array4[m], this.nodeX[1][n15], this.nodeY[1][n15], 1)) {
 								array6[m][n15] = Math.sqrt((this.nodeX[1][n15] - array3[m]) * (this.nodeX[1][n15] - array3[m])
 										+ (this.nodeY[1][n15] - array4[m]) * (this.nodeY[1][n15] - array4[m]));
 							} else {
@@ -1033,157 +1056,41 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		++curLink4[n23];
 	}
 
-	void addBoundary1() {
-		final int n = this.curNode[0];
-		int n3;
-		int n2 = n3 = this.nodeX[0][0];
-		int n5;
-		int n4 = n5 = this.nodeX[1][0];
-		int n7;
-		int n6 = n7 = this.nodeY[0][0];
-		int n9;
-		int n8 = n9 = this.nodeY[1][0];
-		for (int i = 1; i < this.curNode[0]; ++i) {
-			if (this.nodeX[0][i] < n3) {
-				n3 = this.nodeX[0][i];
-			}
-			if (this.nodeX[0][i] > n2) {
-				n2 = this.nodeX[0][i];
-			}
-			if (this.nodeY[0][i] < n7) {
-				n7 = this.nodeY[0][i];
-			}
-			if (this.nodeY[0][i] > n6) {
-				n6 = this.nodeY[0][i];
-			}
-			if (this.nodeX[1][i] < n5) {
-				n5 = this.nodeX[1][i];
-			}
-			if (this.nodeX[1][i] > n4) {
-				n4 = this.nodeX[1][i];
-			}
-			if (this.nodeY[1][i] < n9) {
-				n9 = this.nodeY[1][i];
-			}
-			if (this.nodeY[1][i] > n8) {
-				n8 = this.nodeY[1][i];
-			}
-		}
-		final int[] array = new int[4];
-		final int[] array2 = new int[4];
-		n3 -= 20;
-		n2 += 20;
-		n7 -= 20;
-		n6 += 20;
-		array[0] = n3;
-		array2[0] = n7;
-		array[1] = n2;
-		array2[1] = n7;
-		array[2] = n2;
-		array2[2] = n6;
-		array[3] = n3;
-		array2[3] = n6;
-		for (int j = 0; j < 4; ++j) {
-			this.nodeX[0][this.curNode[0]] = array[j];
-			this.nodeY[0][this.curNode[0]] = array2[j];
-			this.link[0][this.curLink[0]][0] = n + j;
-			this.link[0][this.curLink[0]][1] = n + (j + 1) % 4;
-			final int[] curNode = this.curNode;
-			final int n10 = 0;
-			++curNode[n10];
-			final int[] curLink = this.curLink;
-			final int n11 = 0;
-			++curLink[n11];
-		}
-		final int[] array3 = new int[4];
-		final int[] array4 = new int[4];
-		n5 -= 20;
-		n4 += 20;
-		n9 -= 20;
-		n8 += 20;
-		array3[0] = n5;
-		array4[0] = n9;
-		array3[1] = n4;
-		array4[1] = n9;
-		array3[2] = n4;
-		array4[2] = n8;
-		array3[3] = n5;
-		array4[3] = n8;
-		for (int k = 0; k < 4; ++k) {
-			this.nodeX[1][this.curNode[1]] = array3[k];
-			this.nodeY[1][this.curNode[1]] = array4[k];
-			this.link[1][this.curLink[1]][0] = n + k;
-			this.link[1][this.curLink[1]][1] = n + (k + 1) % 4;
-			this.borderNodes[k] = this.curNode[1];
-			final int[] curNode2 = this.curNode;
-			final int n12 = 1;
-			++curNode2[n12];
-			final int[] curLink2 = this.curLink;
-			final int n13 = 1;
-			++curLink2[n13];
-		}
-		this.bc = 4;
-		this.bound.select(this.bc - 3);
-		int l = 0;
-		int n14 = 0;
-		int n15;
-		for (n15 = 0; n15 < 4; ++n15) {
-			for (l = 0; l < n; ++l) {
-				if (!this.edgeCross(array[n15], array2[n15], this.nodeX[0][l], this.nodeY[0][l], 0, l)) {
-					for (n14 = 0; n14 < 4 && this.edgeCross(array3[n14], array4[n14], this.nodeX[1][l], this.nodeY[1][l], 1, l); ++n14) {
-					}
-					if (n14 < 4) {
-						break;
-					}
-				}
-			}
-			if (l < n) {
-				break;
-			}
-		}
-		if (n15 == 4) {
-			System.out.println("Cannot find a visible node in both graphs");
-			return;
-		}
-		final int[] array5 = new int[4];
-		final int[] array6 = new int[4];
-		for (int n16 = 0; n16 < 4; ++n16) {
-			array5[n16] = this.nodeX[1][n16 + n];
-			array6[n16] = this.nodeY[1][n16 + n];
-		}
-		for (int n17 = 0; n17 < 4; ++n17) {
-			this.nodeX[1][(n17 + n15) % 4 + n] = array5[(n17 + n14) % 4];
-			this.nodeY[1][(n17 + n15) % 4 + n] = array6[(n17 + n14) % 4];
-		}
-		this.link[0][this.curLink[0]][0] = n + n15;
-		this.link[0][this.curLink[0]][1] = l;
-		final int[] curLink3 = this.curLink;
-		final int n18 = 0;
-		++curLink3[n18];
-		this.link[1][this.curLink[1]][0] = n + n15;
-		this.link[1][this.curLink[1]][1] = l;
-		final int[] curLink4 = this.curLink;
-		final int n19 = 1;
-		++curLink4[n19];
-	}
+	/**
+	 * Determines if a given edge intersects with any edge in a given graph.
+	 * 
+	 * @param inputX1    the x coordinate of the first endpoint of the input edge
+	 * @param inputY1    the y coordinate of the first endpoint of the input edge
+	 * @param inputX2    the x coordinate of the second endpoint of the input edge
+	 * @param inputY2    the y coordinate of the second endpoint of the input edge
+	 * @param graphIndex the index of the graph to check for intersection
+	 * @return true if the input edge intersects with any edge in the given graph,
+	 *         false otherwise
+	 */
+	private boolean edgeCross(final int inputX1, final int inputY1, final int inputX2, final int inputY2, final int graphIndex) {
+		// iterate over the edges in the graph
+		for (int i = 0; i < this.curLink[graphIndex]; ++i) {
+			// get the x and y coordinates of the two endpoints of current edge
+			final int currEdgeX1 = this.nodeX[graphIndex][this.link[graphIndex][i][0]];
+			final int currEdgeX2 = this.nodeX[graphIndex][this.link[graphIndex][i][1]];
+			final int currEdgeY1 = this.nodeY[graphIndex][this.link[graphIndex][i][0]];
+			final int currEdgeY2 = this.nodeY[graphIndex][this.link[graphIndex][i][1]];
 
-	boolean edgeCross(final int n, final int n2, final int n3, final int n4, final int n5, final int n6) {
-		for (int i = 0; i < this.curLink[n5]; ++i) {
-			final int n7 = this.nodeX[n5][this.link[n5][i][0]];
-			final int n8 = this.nodeX[n5][this.link[n5][i][1]];
-			final int n9 = this.nodeY[n5][this.link[n5][i][0]];
-			final int n10 = this.nodeY[n5][this.link[n5][i][1]];
-			final int n11 = n8 - n7;
-			final int n12 = n10 - n9;
-			final int n13 = n3 - n;
-			final int n14 = n4 - n2;
-			final int n15 = n - n7;
-			final int n16 = n2 - n9;
-			final double n17 = n13 * n12 - n14 * n11;
-			if (n17 != 0.0) {
-				final double n18 = (n16 * n11 - n12 * n15) / n17;
-				final double n19 = (n16 * n13 - n14 * n15) / n17;
-				if (n18 > 0.0 && n18 < 1.0 && n19 > 0.0 && n19 < 1.0) {
+			// calculate direction vectors for both the input edge and the current edge
+			final int currEdgeXVec = currEdgeX2 - currEdgeX1;
+			final int currEdgeYVec = currEdgeY2 - currEdgeY1;
+			final int inputEdgeXVec = inputX2 - inputX1;
+			final int inputEdgeYVec = inputY2 - inputY1;
+
+			// find area of parallelogram formed by both vectors
+			final double parallelogramArea = inputEdgeXVec * currEdgeYVec - inputEdgeYVec * currEdgeXVec;
+
+			// if area of parallelogram is not zero, the lines may intersect
+			if (parallelogramArea != 0.0) {
+				final double u = (inputX1 - currEdgeX1) * currEdgeXVec + (inputY1 - currEdgeY1) * currEdgeYVec;
+				final double v = (inputX1 - currEdgeX1) * inputEdgeYVec - (inputY1 - currEdgeY1) * inputEdgeXVec;
+				// check if intersection point lies on both lines
+				if (u > 0.0 && u < parallelogramArea && v > 0.0 && v < parallelogramArea) {
 					return true;
 				}
 			}
@@ -1191,89 +1098,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return false;
 	}
 
-	void preFindBorder(final int[] array, final int[] array2, final int n, final int[][] array3, final int n2, final int n3) {
-		final int[][] array4 = new int[40000][200];
-		final int[] array5 = new int[40000];
-		for (int i = 0; i < n; ++i) {
-			array5[i] = 0;
-			for (int j = 0; j < n2; ++j) {
-				if (array3[j][0] == i) {
-					array4[i][array5[i]++] = array3[j][1];
-				}
-				if (array3[j][1] == i) {
-					array4[i][array5[i]++] = array3[j][0];
-				}
-			}
-		}
-		final int[] array6 = new int[200];
-		if (n3 < n) {
-			double n4 = -1000.0;
-			int n5 = -1;
-			for (int k = 0; k < array5[n3]; ++k) {
-				double atan2;
-				for (atan2 = Math.atan2(array[array4[n3][k]] - array[n3],
-						array2[array4[n3][k]] - array2[n3]); atan2 < 0.0; atan2 += (Math.PI * 2)) {
-				}
-				if (atan2 > n4) {
-					n4 = atan2;
-					n5 = k;
-				}
-			}
-			if (array5[n3] > 0) {
-				int bc = 0;
-				final int[] array7 = array5;
-				--array7[n3];
-				array6[bc++] = array4[n3][n5];
-				for (int l = n5; l < array5[n3]; ++l) {
-					array4[n3][l] = array4[n3][l + 1];
-				}
-				int n6 = array6[bc - 1];
-				int n7 = n3;
-				while (n6 != n3) {
-					double n8 = -1000.0;
-					int n9 = -1;
-					final double atan3 = Math.atan2(array[n7] - array[n6], array2[n7] - array2[n6]);
-					for (int n10 = 0; n10 < array5[n6]; ++n10) {
-						double n11;
-						for (n11 = Math.atan2(array[array4[n6][n10]] - array[n6], array2[array4[n6][n10]] - array2[n6])
-								- atan3; n11 < 0.0; n11 += (Math.PI * 2)) {
-						}
-						if (n11 > n8) {
-							n8 = n11;
-							n9 = n10;
-						}
-					}
-					final int[] array8 = array5;
-					final int n12 = n6;
-					--array8[n12];
-					array6[bc++] = array4[n6][n9];
-					for (int n13 = n9; n13 < array5[n6]; ++n13) {
-						array4[n6][n13] = array4[n6][n13 + 1];
-					}
-					n7 = n6;
-					n6 = array6[bc - 1];
-				}
-				final Graphics graphics = this.getGraphics();
-				final Graphics graphics2 = this.bi.getGraphics();
-				this.redrawGraph(graphics2);
-				graphics2.setColor(Color.red);
-				for (int n14 = 0; n14 < bc; ++n14) {
-					graphics2.drawLine(array[array6[n14]] + 10, array2[array6[n14]] + 10, array[array6[(n14 + 1) % bc]] + 10,
-							array2[array6[(n14 + 1) % bc]] + 10);
-					graphics.drawImage(this.bi, 10, 10, this);
-				}
-				graphics2.dispose();
-				graphics.dispose();
-				for (int n15 = 0; n15 < bc; ++n15) {
-					this.borderNodes[n15] = array6[n15];
-				}
-				this.bc = bc;
-				this.bound.select(this.bc - 3);
-			}
-		}
-	}
-
-	void preFindAllPoly(final int[] array, final int[] array2, final int n, final int[][] array3, final int n2) {
+	private void preFindAllPoly(final int[] array, final int[] array2, final int n, final int[][] array3, final int n2) {
 		final int[][] array4 = new int[200][200];
 		final int[] array5 = new int[200];
 		for (int i = 0; i < n; ++i) {
@@ -1457,7 +1282,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void removeRepeated() {
+	private void removeRepeated() {
 		for (int i = 0; i < this.curLink[0]; ++i) {
 			for (int j = i + 1; j < this.curLink[0]; ++j) {
 				if ((this.link[0][i][0] == this.link[0][j][0] || this.link[0][i][0] == this.link[0][j][1])
@@ -1490,7 +1315,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void loadFile() {
+	private void loadFile() {
 		final FileDialog fileDialog = new FileDialog(this.ref, "Load file...", 0);
 		fileDialog.setDirectory(".");
 		fileDialog.show();
@@ -1512,48 +1337,40 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void tokenize(final String s) {
+	private void tokenize(final String s) {
 		int n2 = s.indexOf(32, 0); // find index first space
-		String s2 = s.substring(0, n2);
-		if (s2.equals("node")) {
+		String type = s.substring(0, n2);
+		if (type.equals("node")) {
 			String[] data = s.substring(n2 + 1).split(" ");
-			final int n3 = n2 + 1; // index of first
-			final int index = s.indexOf(32, n3);
-			final int int1 = Integer.parseInt(data[0]);
-			final int int2 = Integer.parseInt(data[1]);
-			final int int3 = Integer.parseInt(data[2]);
+			final int nodeID = Integer.parseInt(data[0]);
+			final int xPos = Integer.parseInt(data[1]);
+			final int yPos = Integer.parseInt(data[2]);
 			final int r = Integer.parseInt(data[3]);
 			final int g = Integer.parseInt(data[4]);
 			final int b = Integer.parseInt(data[5]);
-			final int int7 = Integer.parseInt(data[6]);
-			this.nodeX[int7][int1] = int2;
-			this.nodeY[int7][int1] = int3;
-			this.nodeColor[int7][int1] = new Color(r, g, b);
-			this.nodeID[int7][int1] = int1;
-			this.curNode[int7] = int1 + 1;
+			final int graphID = Integer.parseInt(data[6]); // whether initial (0) or final graph (1)
+			this.nodeX[graphID][nodeID] = xPos;
+			this.nodeY[graphID][nodeID] = yPos;
+			this.nodeColor[graphID][nodeID] = new Color(r, g, b);
+			this.nodeID[graphID][nodeID] = nodeID;
+			this.curNode[graphID] = nodeID + 1;
 			if (r != 255 || g != 255 || b != 255) {
-				this.nodeCount[int7] = int1 + 1;
+				this.nodeCount[graphID] = nodeID + 1;
 			}
 		}
-		if (s2.equals("edge")) {
-			final int n10 = n2 + 1;
-			final int index7 = s.indexOf(32, n10);
-			final int int8 = Integer.parseInt(s.substring(n10, index7));
-			final int n11 = index7 + 1;
-			final int index8 = s.indexOf(32, n11);
-			final int int9 = Integer.parseInt(s.substring(n11, index8));
-			final int n12 = index8 + 1;
-			final int index9 = s.indexOf(32, n12);
-			final int int10 = Integer.parseInt(s.substring(n12, index9));
-			final int n13 = index9 + 1;
-			final int int11 = Integer.parseInt(s.substring(n13, s.indexOf(32, n13)));
-			this.link[int8][int11][0] = int9;
-			this.link[int8][int11][1] = int10;
-			this.curLink[int8] = (this.edgeCount[int8] = int11 + 1);
+		if (type.equals("edge")) {
+			String[] data = s.substring(n2 + 1).split(" ");
+			final int graphID = Integer.parseInt(data[0]); // whether initial (0) or final graph (1)
+			final int toNodeID = Integer.parseInt(data[1]);
+			final int fromNodeID = Integer.parseInt(data[2]);
+			final int edgeID = Integer.parseInt(data[3]);
+			this.link[graphID][edgeID][0] = toNodeID;
+			this.link[graphID][edgeID][1] = fromNodeID;
+			this.curLink[graphID] = (this.edgeCount[graphID] = edgeID + 1);
 		}
 	}
 
-	void saveFile() {
+	private void saveFile() {
 		final FileDialog fileDialog = new FileDialog(this.ref, "Save file...", 1);
 		fileDialog.setDirectory(".");
 		fileDialog.show();
@@ -1580,121 +1397,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void findAllPoly(final int[] array, final int[] array2, final int n, final int[][] array3, final int n2) {
-		final int[][] array4 = new int[40000][200];
-		final int[] array5 = new int[40000];
-		for (int i = 0; i < n; ++i) {
-			array5[i] = 0;
-			for (int j = 0; j < n2; ++j) {
-				if (array3[j][0] == i) {
-					array4[i][array5[i]++] = array3[j][1];
-				}
-				if (array3[j][1] == i) {
-					array4[i][array5[i]++] = array3[j][0];
-				}
-			}
-		}
-		final int[] array6 = new int[200];
-		while (true) {
-			int n3 = -1;
-			int n4 = 10000;
-			for (int k = 0; k < n; ++k) {
-				if (array[k] < n4 && array5[k] > 0) {
-					n4 = array[k];
-					n3 = k;
-				}
-			}
-			if (n3 == -1) {
-				break;
-			}
-			final int n5 = n3;
-			while (array5[n5] > 0) {
-				int nc = 0;
-				final int[] array7 = array5;
-				final int n6 = n5;
-				--array7[n6];
-				array6[nc++] = array4[n5][array5[n5]];
-				int l = array6[nc - 1];
-				int n7 = n5;
-				while (l != n5) {
-					double n8 = -1000.0;
-					int n9 = -1;
-					final double atan2 = Math.atan2(array2[l] - array2[n7], array[l] - array[n7]);
-					for (int n10 = 0; n10 < array5[l]; ++n10) {
-						double n11;
-						for (n11 = Math.atan2(array2[array4[l][n10]] - array2[l], array[array4[l][n10]] - array[l])
-								- atan2; n11 <= 0.0; n11 += (Math.PI * 2)) {
-						}
-						if (n11 > n8) {
-							if (nc > 1) {
-								if (array4[l][n10] == array6[nc - 2] && array5[l] > 1) {
-									continue;
-								}
-							} else if (array4[l][n10] == n5 && array5[l] > 1) {
-								continue;
-							}
-							n8 = n11;
-							n9 = n10;
-						}
-					}
-					final int[] array8 = array5;
-					final int n12 = l;
-					--array8[n12];
-					array6[nc++] = array4[l][n9];
-					for (int n13 = n9; n13 < array5[l]; ++n13) {
-						array4[l][n13] = array4[l][n13 + 1];
-					}
-					n7 = l;
-					l = array6[nc - 1];
-				}
-				boolean b = true;
-				if (this.bc == nc) {
-					int n14;
-					for (n14 = 0; n14 < nc && array6[n14] != this.borderNodes[0]; ++n14) {
-					}
-					int n15;
-					for (n15 = 0; n15 < nc && array6[(n14 + n15) % nc] == this.borderNodes[n15]; ++n15) {
-					}
-					if (n15 == nc) {
-						b = false;
-					}
-					int n16;
-					for (n16 = 0; n16 < nc && array6[(n14 - n16 + nc) % nc] == this.borderNodes[n16]; ++n16) {
-					}
-					if (n16 == nc) {
-						b = false;
-					}
-				}
-				if (!b) {
-					continue;
-				}
-				final Graphics graphics = this.getGraphics();
-				final Graphics graphics2 = this.bi.getGraphics();
-				this.redrawGraph(graphics2);
-				graphics2.setColor(Color.green);
-				for (int n17 = 0; n17 < nc; ++n17) {
-					System.out.print(" " + array6[n17]);
-					graphics2.drawLine(array[array6[n17]] + 10, array2[array6[n17]] + 10, array[array6[(n17 + 1) % nc]] + 10,
-							array2[array6[(n17 + 1) % nc]] + 10);
-					graphics.drawImage(this.bi, 10, 10, this);
-					try {
-						Thread.sleep(500L);
-					} catch (Exception ex) {
-					}
-				}
-				graphics2.dispose();
-				graphics.dispose();
-				for (int n18 = 0; n18 < nc; ++n18) {
-					this.curNodes[n18] = array6[n18];
-				}
-				this.nc = nc;
-				System.out.println("");
-				this.doTriangulate();
-			}
-		}
-	}
-
-	void doTriangulate() {
+	private void doTriangulate() {
 		final int[] array = new int[200];
 		final int[] array2 = new int[200];
 		final int[][] array3 = new int[800][2];
@@ -1757,7 +1460,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.nc = 0;
 	}
 
-	void correctEdges() {
+	private void correctEdges() {
 		final int n = this.curNode[0];
 		final int n2 = this.correctNc - 1;
 		final int correctEc = this.curLink[0];
@@ -1820,7 +1523,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.correctNc = this.curNode[0];
 	}
 
-	int isInExtra(final int n) {
+	private int isInExtra(final int n) {
 		for (int i = 0; i < this.extraNodeCount; ++i) {
 			if (this.extraNodes[i][0] == n) {
 				return this.extraNodes[i][1];
@@ -1829,125 +1532,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return -1;
 	}
 
-	void findBorder(final int[] array, final int[] array2, final int n, final int[][] array3, final int n2, final int n3) {
-		final int[][] array4 = new int[40000][200];
-		final int[] array5 = new int[40000];
-		for (int i = 0; i < n; ++i) {
-			array5[i] = 0;
-			for (int j = 0; j < n2; ++j) {
-				if (array3[j][0] == i) {
-					array4[i][array5[i]++] = array3[j][1];
-				}
-				if (array3[j][1] == i) {
-					array4[i][array5[i]++] = array3[j][0];
-				}
-			}
-		}
-		final int[] array6 = new int[200];
-		if (n3 < n) {
-			double n4 = -1000.0;
-			int n5 = -1;
-			for (int k = 0; k < array5[n3]; ++k) {
-				double atan2;
-				for (atan2 = Math.atan2(array[array4[n3][k]] - array[n3],
-						array2[array4[n3][k]] - array2[n3]); atan2 < 0.0; atan2 += (Math.PI * 2)) {
-				}
-				if (atan2 > n4) {
-					n4 = atan2;
-					n5 = k;
-				}
-			}
-			if (array5[n3] > 0) {
-				int bc = 0;
-				final int[] array7 = array5;
-				--array7[n3];
-				array6[bc++] = array4[n3][n5];
-				for (int l = n5; l < array5[n3]; ++l) {
-					array4[n3][l] = array4[n3][l + 1];
-				}
-				int n6 = array6[bc - 1];
-				int n7 = n3;
-				while (n6 != n3) {
-					double n8 = -1000.0;
-					int n9 = -1;
-					final double atan3 = Math.atan2(array[n7] - array[n6], array2[n7] - array2[n6]);
-					for (int n10 = 0; n10 < array5[n6]; ++n10) {
-						double n11;
-						for (n11 = Math.atan2(array[array4[n6][n10]] - array[n6], array2[array4[n6][n10]] - array2[n6])
-								- atan3; n11 < 0.0; n11 += (Math.PI * 2)) {
-						}
-						if (n11 > n8) {
-							if (bc > 1) {
-								if (array4[n6][n10] == array6[bc - 2] && array5[n6] > 1) {
-									continue;
-								}
-							} else if (array4[n6][n10] == n3 && array5[n6] > 1) {
-								continue;
-							}
-							n8 = n11;
-							n9 = n10;
-						}
-					}
-					final int[] array8 = array5;
-					final int n12 = n6;
-					--array8[n12];
-					array6[bc++] = array4[n6][n9];
-					for (int n13 = n9; n13 < array5[n6]; ++n13) {
-						array4[n6][n13] = array4[n6][n13 + 1];
-					}
-					n7 = n6;
-					n6 = array6[bc - 1];
-				}
-				final Graphics graphics = this.getGraphics();
-				final Graphics graphics2 = this.bi.getGraphics();
-				this.redrawGraph(graphics2);
-				graphics2.setColor(Color.red);
-				for (int n14 = 0; n14 < bc; ++n14) {
-					graphics2.drawLine(array[array6[n14]] + 10, array2[array6[n14]] + 10, array[array6[(n14 + 1) % bc]] + 10,
-							array2[array6[(n14 + 1) % bc]] + 10);
-					System.out.print(" " + array6[n14]);
-					graphics.drawImage(this.bi, 10, 10, this);
-					try {
-						Thread.sleep(500L);
-					} catch (Exception ex) {
-					}
-				}
-				graphics2.dispose();
-				graphics.dispose();
-				for (int n15 = 0; n15 < bc; ++n15) {
-					this.borderNodes[n15] = array6[n15];
-				}
-				this.bc = bc;
-				this.bound.select(this.bc - 3);
-			}
-		}
-		System.out.println("");
-	}
-
-	boolean uniquePoly(final int[] array, final int n, final int[][] array2, final int n2, final int[] array3) {
-		for (int i = 0; i < n2; ++i) {
-			if (array3[i] == n) {
-				int n3;
-				for (n3 = 0; n3 < n && array2[i][0] != array[n3]; ++n3) {
-				}
-				int n4;
-				for (n4 = 0; n4 < n && array2[i][n4] == array[(n4 + n3) % n]; ++n4) {
-				}
-				if (n4 == n) {
-					return false;
-				}
-				int n5;
-				for (n5 = 0; n5 < n && array2[i][n5] == array[(n3 - n5 + n) % n]; ++n5) {
-				}
-				if (n5 == n) {
-					return false;
-				}
-			}
-		}
-		return true;
-	}
-
-	void changeMode() {
+	private void changeMode() {
 		final Graphics graphics = this.getGraphics();
 		if (this.animateMode) {
 			this.ch.setEnabled(true);
@@ -2012,7 +1597,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		graphics.dispose();
 	}
 
-	void animate(final boolean b) {
+	private void animate(final boolean b) {
 		if (b) {
 			this.dir = 1;
 		} else {
@@ -2024,7 +1609,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.doAnimate = true;
 	}
 
-	void stopAnimate() {
+	private void stopAnimate() {
 		this.doAnimate = false;
 		this.totFrames.setEnabled(true);
 		this.frameRate.setEnabled(true);
@@ -2032,6 +1617,9 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.curFrame -= this.dir;
 	}
 
+	/**
+	 * Animation tick.
+	 */
 	void tick() {
 		boolean b = false;
 		if (this.curFrame > this.totFrames.getValue()) {
@@ -2072,12 +1660,12 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void captureFrame() {
+	private void captureFrame() {
 		this.curFrame = this.frames.getValue();
 		this.tick();
 	}
 
-	void redrawDimGraph(final Graphics graphics) {
+	private void redrawDimGraph(final Graphics graphics) {
 		final Graphics2D graphics2D = (Graphics2D) graphics;
 		graphics2D.setColor(Color.white);
 		graphics2D.fillRect(0, 0, 600, 550);
@@ -2130,24 +1718,12 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void translate(final int n, final int n2) {
-		for (int i = 0; i < this.curNode[0]; ++i) {
-			final int[] array = this.nodeX[0];
-			final int n3 = i;
-			array[n3] += n;
-			final int[] array2 = this.nodeX[1];
-			final int n4 = i;
-			array2[n4] += n;
-			final int[] array3 = this.nodeY[0];
-			final int n5 = i;
-			array3[n5] += n2;
-			final int[] array4 = this.nodeY[1];
-			final int n6 = i;
-			array4[n6] += n2;
-		}
-	}
-
-	void calcFramesRigid() {
+	/**
+	 * Align the two graphs using 2-D transformations consisting of translation,
+	 * rotation, scaling and shearing. That is, we move the source graph as close as
+	 * possible to the destination graph as a rigid object in space.
+	 */
+	private void calcFramesRigid() {
 		double n = 0.0;
 		double n2 = 0.0;
 		double n3 = 0.0;
@@ -2159,73 +1735,71 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		double n9 = 0.0;
 		double n10 = 0.0;
 		double n11 = 0.0;
-		final double[] array = new double[2];
-		final double[] array2 = new double[2];
-		final double n12 = 0.0;
-		this.cy = n12;
-		this.cx = n12;
+		this.centerX = 0;
+		this.centerY = 0;
+		// calculate the center of the first set of nodes
 		for (int i = 0; i < this.curNode[0]; ++i) {
-			this.cx += this.nodeX[0][i];
-			this.cy += this.nodeY[0][i];
+			this.centerX += this.nodeX[0][i];
+			this.centerY += this.nodeY[0][i];
 		}
-		this.cx /= this.curNode[0];
-		this.cy /= this.curNode[0];
+		this.centerX /= this.curNode[0];
+		this.centerY /= this.curNode[0];
 		for (int j = 0; j < this.curNode[0]; ++j) {
-			array[0] = (this.nodeX[1][j] - this.cx) / 100.0;
-			array[1] = (this.nodeX[0][j] - this.cx) / 100.0;
-			array2[0] = (this.nodeY[1][j] - this.cy) / 100.0;
-			array2[1] = (this.nodeY[0][j] - this.cy) / 100.0;
-			n += array[1] * array[1];
-			n2 += array2[1] * array2[1];
-			n3 += array[1];
-			n4 += array2[1];
-			n5 += array[1] * array2[1];
-			n6 += array[0] * array2[1];
-			n7 += array[0];
-			n8 += array[1] * array[0];
-			n9 += array2[0] * array2[1];
-			n10 += array2[0];
-			n11 += array[1] * array2[0];
+			double dxA = (this.nodeX[0][j] - this.centerX) / 100.0;
+			double dyA = (this.nodeY[0][j] - this.centerY) / 100.0;
+			double dxB = (this.nodeX[1][j] - this.centerX) / 100.0;
+			double dyB = (this.nodeY[1][j] - this.centerY) / 100.0;
+			n += dxA * dxA;
+			n2 += dyA * dyA;
+			n3 += dxA;
+			n4 += dyA;
+			n5 += dxA * dyA;
+			n6 += dxB * dyA;
+			n7 += dxB;
+			n8 += dxA * dxB;
+			n9 += dyB * dyA;
+			n10 += dyB;
+			n11 += dxA * dyB;
 		}
 		final double n13 = n5 * n5;
 		final double n14 = n4 * n4;
 		final double n15 = this.curNode[0];
 		final double n16 = n * (n15 * n2 - n14) - n15 * n13 + n3 * (2.0 * n4 * n5 - n3 * n2);
-		this.a11 = -(n5 * (n15 * n6 - n7 * n4) + n8 * (n14 - n15 * n2) + n3 * (n7 * n2 - n4 * n6));
-		this.a11 /= n16;
-		this.a12 = n * (n15 * n6 - n7 * n4) + n5 * (n7 * n3 - n15 * n8) + n3 * (n4 * n8 - n3 * n6);
-		this.a12 /= n16;
-		this.a13 = n * (n7 * n2 - n4 * n6) - n7 * n13 + n5 * (n4 * n8 + n3 * n6) - n3 * n2 * n8;
-		this.a13 = this.a13 / n16 * 100.0;
-		this.a21 = -(n5 * (n15 * n9 - n10 * n4) + n11 * (n14 - n15 * n2) + n3 * (n10 * n2 - n4 * n9));
-		this.a21 /= n16;
-		this.a22 = n * (n15 * n9 - n10 * n4) + n5 * (n10 * n3 - n15 * n11) + n3 * (n4 * n11 - n3 * n9);
-		this.a22 /= n16;
-		this.a23 = n * (n10 * n2 - n4 * n9) - n10 * n13 + n5 * (n4 * n11 + n3 * n9) - n3 * n2 * n11;
-		this.a23 = this.a23 / n16 * 100.0;
-		final double n17 = (this.a11 * this.a22 - this.a12 * this.a21 < 0.0) ? -1.0 : 1.0;
-		this.q11 = this.a11 + n17 * this.a22;
-		this.q12 = this.a12 - n17 * this.a21;
-		this.q21 = this.a21 - n17 * this.a12;
-		this.q22 = this.a22 + n17 * this.a11;
-		final double sqrt = Math.sqrt(this.q11 * this.q11 + this.q12 * this.q12);
-		this.q11 /= sqrt;
-		this.q12 /= sqrt;
-		this.q21 /= sqrt;
-		this.q22 /= sqrt;
-		this.rtheta = Math.atan2(this.a21, this.a11);
-		final double n18 = this.q11 * this.q22 - this.q12 * this.q21;
-		final double n19 = this.q22 / n18;
-		final double n20 = -this.q12 / n18;
-		final double n21 = -this.q21 / n18;
-		final double n22 = this.q11 / n18;
-		this.s11 = n19 * this.a11 + n20 * this.a21;
-		this.s12 = n19 * this.a12 + n20 * this.a22;
-		this.s21 = n21 * this.a11 + n22 * this.a21;
-		this.s22 = n21 * this.a12 + n22 * this.a22;
+		double a11 = -(n5 * (n15 * n6 - n7 * n4) + n8 * (n14 - n15 * n2) + n3 * (n7 * n2 - n4 * n6));
+		a11 /= n16;
+		double a12 = n * (n15 * n6 - n7 * n4) + n5 * (n7 * n3 - n15 * n8) + n3 * (n4 * n8 - n3 * n6);
+		a12 /= n16;
+		a13 = n * (n7 * n2 - n4 * n6) - n7 * n13 + n5 * (n4 * n8 + n3 * n6) - n3 * n2 * n8;
+		a13 = a13 / n16 * 100.0;
+		double a21 = -(n5 * (n15 * n9 - n10 * n4) + n11 * (n14 - n15 * n2) + n3 * (n10 * n2 - n4 * n9));
+		a21 /= n16;
+		double a22 = n * (n15 * n9 - n10 * n4) + n5 * (n10 * n3 - n15 * n11) + n3 * (n4 * n11 - n3 * n9);
+		a22 /= n16;
+		a23 = n * (n10 * n2 - n4 * n9) - n10 * n13 + n5 * (n4 * n11 + n3 * n9) - n3 * n2 * n11;
+		a23 = a23 / n16 * 100.0;
+		final double n17 = (a11 * a22 - a12 * a21 < 0.0) ? -1.0 : 1.0;
+		double q11 = a11 + n17 * a22;
+		double q12 = a12 - n17 * a21;
+		double q21 = a21 - n17 * a12;
+		double q22 = a22 + n17 * a11;
+		final double sqrt = Math.sqrt(q11 * q11 + q12 * q12);
+		q11 /= sqrt;
+		q12 /= sqrt;
+		q21 /= sqrt;
+		q22 /= sqrt;
+		rtheta = Math.atan2(a21, a11);
+		final double n18 = q11 * q22 - q12 * q21;
+		final double n19 = q22 / n18;
+		final double n20 = -q12 / n18;
+		final double n21 = -q21 / n18;
+		final double n22 = q11 / n18;
+		s11 = n19 * a11 + n20 * a21;
+		s12 = n19 * a12 + n20 * a22;
+		s21 = n21 * a11 + n22 * a21;
+		s22 = n21 * a12 + n22 * a22;
 	}
 
-	void linearMotion(final Graphics graphics) {
+	private void linearMotion(final Graphics graphics) {
 		final int[] array = new int[this.curNode[0]];
 		final int[] array2 = new int[this.curNode[0]];
 		final int value = this.totFrames.getValue();
@@ -2248,7 +1822,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.drawAnimatedGraph(graphics, array, array2, array3);
 	}
 
-	void rigidMotion(final Graphics graphics, final boolean b) {
+	private void rigidMotion(final Graphics graphics, final boolean b) {
 		final int value = this.totFrames.getValue();
 		final int n = value / 4;
 		if (this.curFrame <= n * 2) {
@@ -2260,23 +1834,23 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void rigid1(final Graphics graphics, final int n, final int n2, final boolean b) {
+	private void rigid1(final Graphics graphics, final int n, final int n2, final boolean b) {
 		final int[] array = new int[this.curNode[0]];
 		final int[] array2 = new int[this.curNode[0]];
 		final Color[] array3 = new Color[this.curNode[0]];
 		final double n3 = n / (double) n2;
 		final double n4 = this.rtheta * n3;
-		this.q11 = Math.cos(n4);
-		this.q12 = -Math.sin(n4);
-		this.q21 = Math.sin(n4);
-		this.q22 = Math.cos(n4);
+		double q11 = Math.cos(n4);
+		double q12 = -Math.sin(n4);
+		double q21 = Math.sin(n4);
+		double q22 = Math.cos(n4);
 		final double n5 = 1.0 - n3 + n3 * this.s11;
 		final double n6 = n3 * this.s12;
 		final double n7 = n3 * this.s21;
 		final double n8 = 1.0 - n3 + n3 * this.s22;
 		for (int i = 0; i < this.curNode[0]; ++i) {
-			final double n9 = this.nodeX[0][i] - this.cx;
-			final double n10 = this.nodeY[0][i] - this.cy;
+			final double n9 = this.nodeX[0][i] - this.centerX;
+			final double n10 = this.nodeY[0][i] - this.centerY;
 			final Color color = this.nodeColor[0][i];
 			final int red = color.getRed();
 			final int green = color.getGreen();
@@ -2286,8 +1860,8 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 					blue + (color2.getBlue() - blue) * n / n2);
 			final double n11 = n5 * n9 + n6 * n10;
 			final double n12 = n7 * n9 + n8 * n10;
-			array[i] = (int) (this.q11 * n11 + this.q12 * n12 + this.a13 * n3 + this.cx);
-			array2[i] = (int) (this.q21 * n11 + this.q22 * n12 + this.a23 * n3 + this.cy);
+			array[i] = (int) (q11 * n11 + q12 * n12 + this.a13 * n3 + this.centerX);
+			array2[i] = (int) (q21 * n11 + q22 * n12 + this.a23 * n3 + this.centerY);
 			if (b) {
 				this.nodeX[0][i] = array[i];
 				this.nodeY[0][i] = array2[i];
@@ -2296,18 +1870,18 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.drawAnimatedGraph(graphics, array, array2, array3);
 	}
 
-	void rigid2(final Graphics graphics, final int n, final int n2) {
+	private void rigid2(final Graphics graphics, final int n, final int n2) {
 		final int[] array = new int[this.curNode[0]];
 		final int[] array2 = new int[this.curNode[0]];
 		final Color[] array3 = new Color[this.curNode[0]];
 		final double n3 = n / (double) n2;
-		this.q11 = Math.cos(this.rtheta);
-		this.q12 = -Math.sin(this.rtheta);
-		this.q21 = Math.sin(this.rtheta);
-		this.q22 = Math.cos(this.rtheta);
+		double q11 = Math.cos(this.rtheta);
+		double q12 = -Math.sin(this.rtheta);
+		double q21 = Math.sin(this.rtheta);
+		double q22 = Math.cos(this.rtheta);
 		for (int i = 0; i < this.curNode[0]; ++i) {
-			final double n4 = this.nodeX[0][i] - this.cx;
-			final double n5 = this.nodeY[0][i] - this.cy;
+			final double n4 = this.nodeX[0][i] - this.centerX;
+			final double n5 = this.nodeY[0][i] - this.centerY;
 			final double n6 = this.nodeX[1][i];
 			final double n7 = this.nodeY[1][i];
 			final Color color = this.nodeColor[0][i];
@@ -2319,19 +1893,19 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 					blue + (color2.getBlue() - blue) * n / n2);
 			final double n8 = this.s11 * n4 + this.s12 * n5;
 			final double n9 = this.s21 * n4 + this.s22 * n5;
-			final double n10 = (int) (this.q11 * n8 + this.q12 * n9 + this.a13 + this.cx);
-			final double n11 = (int) (this.q21 * n8 + this.q22 * n9 + this.a23 + this.cy);
+			final double n10 = (int) (q11 * n8 + q12 * n9 + this.a13 + this.centerX);
+			final double n11 = (int) (q21 * n8 + q22 * n9 + this.a23 + this.centerY);
 			array[i] = (int) (n10 + (n6 - n10) * n3);
 			array2[i] = (int) (n11 + (n7 - n11) * n3);
 		}
 		this.drawAnimatedGraph(graphics, array, array2, array3);
 	}
 
-	double getAngle(final int n, final int n2, final int n3, final int n4) {
+	private static double getAngle(final int n, final int n2, final int n3, final int n4) {
 		return Math.acos((n * (double) n3 + n2 * n4) / Math.sqrt(n * (double) n + n2 * n2) / Math.sqrt(n3 * (double) n3 + n4 * n4));
 	}
 
-	void gauss(final double[][] array, final int n, final int n2, final int[] array2, final int n3) {
+	private void gauss(final double[][] array, final int n, final int n2, final int[] array2, final int n3) {
 		for (int i = 0; i < n - 1; ++i) {
 			for (int j = i + 1; j < n; ++j) {
 				this.rowManipulate(array[j], array[i], array[j][i] / array[i][i], n2);
@@ -2346,14 +1920,14 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void rowManipulate(final double[] array, final double[] array2, final double n, final int n2) {
+	private void rowManipulate(final double[] array, final double[] array2, final double n, final int n2) {
 		for (int i = 0; i < n2; ++i) {
 			final int n3 = i;
 			array[n3] -= array2[i] * n;
 		}
 	}
 
-	void sort(final double[] array, final int n) {
+	private void sort(final double[] array, final int n) {
 		final int[] array2 = new int[n];
 		for (int i = 0; i < n; ++i) {
 			array2[i] = i;
@@ -2375,23 +1949,27 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void calcFramesConvex() {
-		final int n = this.curNode[0];
+	/**
+	 * Introduces “bend” vertices on all edges with bends. In the case of a
+	 * curvilinear drawing, we approximate the curves by piecewise linear curves.
+	 * For every edge in the graph, we ensure that the same number of bend vertices
+	 * are introduced in both source and destination graphs.
+	 */
+	private void calcFramesConvex() {
+		final int nodeCount = this.curNode[0];
 		final int n2 = this.bound.getSelectedIndex() + 3;
 		final double[] array = new double[200];
 		final double[] array2 = new double[200];
 		final double[] array3 = new double[200];
-		for (int i = 0; i < n; ++i) {
+		for (int i = 0; i < nodeCount; ++i) {
 			int n3;
 			for (n3 = 0; n3 < n2 && this.borderNodes[n3] != i; ++n3) {
 			}
 			if (n3 == n2) {
-				final int n4 = this.nodeX[0][i];
-				final int n5 = this.nodeY[0][i];
 				double n7;
 				double n6 = n7 = 0.0;
 				int n8 = 0;
-				for (int j = 0; j < n; ++j) {
+				for (int j = 0; j < nodeCount; ++j) {
 					if (this.adjMat(i, j)) {
 						array3[j] = Math.atan2(this.nodeX[0][j] - this.nodeX[0][i], this.nodeY[0][j] - this.nodeY[0][i]) + Math.PI;
 						++n8;
@@ -2399,22 +1977,22 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 						array3[j] = 1000.0;
 					}
 				}
-				this.sort(array3, n);
+				this.sort(array3, nodeCount);
 				for (int n9 = n8, k = 0; k < n9; ++k) {
 					final int n10 = (int) array3[k];
 					final int n11 = (int) array3[(k - 1 + n9) % n9];
 					final int n12 = (int) array3[(k + 1) % n9];
 					final int n13 = this.nodeX[0][n10] - this.nodeX[0][i];
 					final int n14 = this.nodeY[0][n10] - this.nodeY[0][i];
-					array2[n10] = (Math.tan(
-							this.getAngle(n13, n14, this.nodeX[0][n11] - this.nodeX[0][i], this.nodeY[0][n11] - this.nodeY[0][i]) / 2.0)
-							+ Math.tan(this.getAngle(n13, n14, this.nodeX[0][n12] - this.nodeX[0][i], this.nodeY[0][n12] - this.nodeY[0][i])
-									/ 2.0))
+					array2[n10] = (Math
+							.tan(getAngle(n13, n14, this.nodeX[0][n11] - this.nodeX[0][i], this.nodeY[0][n11] - this.nodeY[0][i]) / 2.0)
+							+ Math.tan(
+									getAngle(n13, n14, this.nodeX[0][n12] - this.nodeX[0][i], this.nodeY[0][n12] - this.nodeY[0][i]) / 2.0))
 							/ Math.sqrt(n13 * n13 + n14 * n14);
 					n7 += array2[n10];
 				}
 				int n15 = 0;
-				for (int l = 0; l < n; ++l) {
+				for (int l = 0; l < nodeCount; ++l) {
 					if (this.adjMat(i, l)) {
 						array3[l] = Math.atan2(this.nodeX[1][l] - this.nodeX[1][i], this.nodeY[1][l] - this.nodeY[1][i]) + Math.PI;
 						++n15;
@@ -2422,21 +2000,21 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 						array3[l] = 1000.0;
 					}
 				}
-				this.sort(array3, n);
+				this.sort(array3, nodeCount);
 				for (int n16 = n15, n17 = 0; n17 < n16; ++n17) {
 					final int n18 = (int) array3[n17];
 					final int n19 = (int) array3[(n17 - 1 + n16) % n16];
 					final int n20 = (int) array3[(n17 + 1) % n16];
 					final int n21 = this.nodeX[1][n18] - this.nodeX[1][i];
 					final int n22 = this.nodeY[1][n18] - this.nodeY[1][i];
-					array[n18] = (Math.tan(
-							this.getAngle(n21, n22, this.nodeX[1][n19] - this.nodeX[1][i], this.nodeY[1][n19] - this.nodeY[1][i]) / 2.0)
-							+ Math.tan(this.getAngle(n21, n22, this.nodeX[1][n20] - this.nodeX[1][i], this.nodeY[1][n20] - this.nodeY[1][i])
-									/ 2.0))
+					array[n18] = (Math
+							.tan(getAngle(n21, n22, this.nodeX[1][n19] - this.nodeX[1][i], this.nodeY[1][n19] - this.nodeY[1][i]) / 2.0)
+							+ Math.tan(
+									getAngle(n21, n22, this.nodeX[1][n20] - this.nodeX[1][i], this.nodeY[1][n20] - this.nodeY[1][i]) / 2.0))
 							/ Math.sqrt(n21 * n21 + n22 * n22);
 					n6 += array[n18];
 				}
-				for (int n23 = 0; n23 < n; ++n23) {
+				for (int n23 = 0; n23 < nodeCount; ++n23) {
 					if (this.adjMat(i, n23)) {
 						this.lamda0[i][n23] = array2[n23] / n7;
 						this.lamda1[i][n23] = array[n23] / n6;
@@ -2449,7 +2027,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.calcFramesConvex1();
 	}
 
-	void calcFramesConvex1() {
+	private void calcFramesConvex1() {
 		final double n = 0.0;
 		this.uY1 = n;
 		this.uX1 = n;
@@ -2510,7 +2088,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	boolean adjMat(final int n, final int n2) {
+	private boolean adjMat(final int n, final int n2) {
 		for (int i = 0; i < this.curLink[0]; ++i) {
 			if ((this.link[0][i][0] == n && this.link[0][i][1] == n2) || (this.link[0][i][0] == n2 && this.link[0][i][1] == n)) {
 				return true;
@@ -2519,7 +2097,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return false;
 	}
 
-	void ConvexMotion(final Graphics graphics, final int n, final int n2) {
+	private void ConvexMotion(final Graphics graphics, final int n, final int n2) {
 		final int n3 = this.curNode[0];
 		final Color[] array = new Color[this.curNode[0]];
 		final int n4 = this.bound.getSelectedIndex() + 3;
@@ -2601,7 +2179,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.drawAnimatedGraph(graphics, array5, array6, array);
 	}
 
-	void ConvexMotion1(final Graphics graphics, final double[] array, final double[] array2, final int n, final int n2) {
+	private void ConvexMotion1(final Graphics graphics, final double[] array, final double[] array2, final int n, final int n2) {
 		final int n3 = this.bound.getSelectedIndex() + 3;
 		final int n4 = this.curNode[0];
 		final Color[] array3 = new Color[this.curNode[0]];
@@ -2628,7 +2206,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	void drawAnimatedGraph(final Graphics graphics, final int[] array, final int[] array2, final Color[] array3) {
+	private void drawAnimatedGraph(final Graphics graphics, final int[] array, final int[] array2, final Color[] array3) {
 		final Graphics2D graphics2D = (Graphics2D) graphics;
 		final int n = 10;
 		this.redrawDimGraph(graphics2D);
@@ -2652,120 +2230,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	int findPoly(final int[] array, final int[] array2, final int n, final int[][] array3, final int n2, final int n3, final int[][] array4,
-			int n4, final int[][] array5, int n5) {
-		final int[][] array6 = new int[200][200];
-		final int[] array7 = new int[200];
-		for (int i = 0; i < n; ++i) {
-			array7[i] = 0;
-			for (int j = 0; j < n2; ++j) {
-				if (array3[j][0] == i) {
-					array6[i][array7[i]++] = array3[j][1];
-				}
-				if (array3[j][1] == i) {
-					array6[i][array7[i]++] = array3[j][0];
-				}
-			}
-		}
-		final int[] array8 = new int[200];
-		final double[] array9 = new double[200];
-		for (int k = n3; k < n; ++k) {
-			for (int l = 0; l < array7[k]; ++l) {
-				double atan2;
-				int n6;
-				for (atan2 = Math.atan2(array2[array6[k][l]] - array2[k], array[array6[k][l]] - array[k]), n6 = l - 1; n6 >= 0
-						&& atan2 <= array9[n6]; --n6) {
-				}
-				++n6;
-				for (int n7 = l; n7 > n6; --n7) {
-					array8[n7] = array8[n7 - 1];
-					array9[n7] = array9[n7 - 1];
-				}
-				array8[n6] = array6[k][l];
-				array9[n6] = atan2;
-			}
-			for (int n8 = 0; n8 < array7[k]; ++n8) {
-				int n9;
-				for (n9 = 0; n9 < array7[array8[n8]] && array6[array8[n8]][n9] != array8[(n8 + 1) % array7[k]]; ++n9) {
-				}
-				if (n9 == array7[array8[n8]]) {
-					array4[n4][0] = array8[n8];
-					array4[n4][1] = array8[(n8 + 1) % array7[k]];
-					++n4;
-					array5[n5][0] = array8[n8];
-					array5[n5][1] = array8[(n8 + 1) % array7[k]];
-					++n5;
-					array6[array8[n8]][array7[array8[n8]]++] = array8[(n8 + 1) % array7[k]];
-					array6[array8[(n8 + 1) % array7[k]]][array7[array8[(n8 + 1) % array7[k]]]++] = array8[n8];
-				}
-			}
-		}
-		return n5;
-	}
-
-	int findPoly1(final int[] array, final int[] array2, final int n, final int[][] array3, final int n2, final int n3,
-			final int[][] array4, int n4, final int[][] array5, int n5) {
-		final int[][] array6 = new int[40000][200];
-		final int[] array7 = new int[40000];
-		for (int i = 0; i < n; ++i) {
-			array7[i] = 0;
-			for (int j = 0; j < n2; ++j) {
-				if (array3[j][0] == i) {
-					array6[i][array7[i]++] = array3[j][1];
-				}
-				if (array3[j][1] == i) {
-					array6[i][array7[i]++] = array3[j][0];
-				}
-			}
-		}
-		final int[] array8 = new int[200];
-		for (int k = n3; k < n; ++k) {
-			while (array7[k] > 0) {
-				int n6 = 0;
-				final int[] array9 = array7;
-				final int n7 = k;
-				--array9[n7];
-				array8[n6++] = array6[k][array7[k]];
-				int l = array8[n6 - 1];
-				int n8 = k;
-				while (l != k) {
-					double n9 = -1000.0;
-					int n10 = -1;
-					final double atan2 = Math.atan2(array[n8] - array[l], array2[n8] - array2[l]);
-					for (int n11 = 0; n11 < array7[l]; ++n11) {
-						double n12;
-						for (n12 = Math.atan2(array[array6[l][n11]] - array[l], array2[array6[l][n11]] - array2[l])
-								- atan2; n12 < 0.0; n12 += (Math.PI * 2)) {
-						}
-						if (n12 > n9) {
-							n9 = n12;
-							n10 = n11;
-						}
-					}
-					final int[] array10 = array7;
-					final int n13 = l;
-					--array10[n13];
-					array8[n6++] = array6[l][n10];
-					for (int n14 = n10; n14 < array7[l]; ++n14) {
-						array6[l][n14] = array6[l][n14 + 1];
-					}
-					n8 = l;
-					l = array8[n6 - 1];
-				}
-				for (int n15 = 2; n15 < n6 - 1; ++n15) {
-					array4[n4][0] = array8[0];
-					array4[n4][1] = array8[n15];
-					++n4;
-					array5[n5][0] = array8[0];
-					array5[n5][1] = array8[n15];
-					++n5;
-				}
-			}
-		}
-		return n5;
-	}
-
-	int triangulate(final int[] array, int i, final int[][] array2, int n, final int[] array3, final int[] array4) {
+	private int triangulate(final int[] array, int i, final int[][] array2, int n, final int[] array3, final int[] array4) {
 		int n2 = 0;
 		int left = 0;
 		int inside = 0;
@@ -2808,11 +2273,11 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return n;
 	}
 
-	int inside(final int n, final int n2, final int n3, final int[] array, final int n4, final int[] array2, final int[] array3) {
+	private int inside(final int n, final int n2, final int n3, final int[] array, final int n4, final int[] array2, final int[] array3) {
 		int n5 = 10000;
 		int n6 = -1;
 		for (int i = 0; i < n4; ++i) {
-			if (this.getAngle1(n, n2, n3, array[i], array2, array3) == (Math.PI * 2) && n5 > array2[i]) {
+			if (getAngle1(n, n2, n3, array[i], array2, array3) == (Math.PI * 2) && n5 > array2[i]) {
 				n5 = array2[i];
 				n6 = i;
 			}
@@ -2820,7 +2285,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return n6;
 	}
 
-	double getAngle1(final int n, final int n2, final int n3, final int n4, final int[] array, final int[] array2) {
+	private static double getAngle1(final int n, final int n2, final int n3, final int n4, final int[] array, final int[] array2) {
 		final int n5 = array[n2] - array[n4];
 		final int n6 = array2[n2] - array2[n4];
 		final int n7 = array[n3] - array[n4];
@@ -2851,7 +2316,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return n3;
 	}
 
-	void findSteiner1(final int n, final int[] array, final int[] array2, int n2, final int[] array3, final int[] array4, int n3,
+	private void findSteiner1(final int n, final int[] array, final int[] array2, int n2, final int[] array3, final int[] array4, int n3,
 			final int[][] array5, int n4, final int[][] array6, int n5, final int[] array7) {
 		final int[][] array8 = new int[n * n][2];
 		final int[] array9 = new int[n * n];

@@ -5,14 +5,16 @@ import java.awt.Frame;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 
-class GraphMorph extends Frame implements WindowListener {
+public class GraphMorph extends Frame implements WindowListener {
+	
 	GraphMorphNonIntersect np;
 
-	public void main() {
+	public static void main(String[] args) {
 		GraphMorph graphMorph = new GraphMorph();
 		graphMorph.setSize(1000, 700);
 		graphMorph.doJob();
 		graphMorph.setTitle("Graph Morphing");
+		graphMorph.setLocationRelativeTo(null);
 		graphMorph.show();
 	}
 
@@ -30,6 +32,7 @@ class GraphMorph extends Frame implements WindowListener {
 	}
 
 	public void windowClosed(WindowEvent paramWindowEvent) {
+		System.exit(0);
 	}
 
 	public void windowClosing(WindowEvent paramWindowEvent) {
