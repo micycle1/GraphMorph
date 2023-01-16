@@ -727,7 +727,6 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 			graphics4.dispose();
 		}
 	}
-	
 
 	private void drawArc(final Graphics graphics, int n, int n2) {
 		boolean b = false;
@@ -1029,7 +1028,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 				}
 			}
 		}
-		System.out.println("" + i2 + "  " + m + "  " + l);
+//		System.out.println("" + i2 + "  " + m + "  " + l);
 		if (i2 == -1) {
 			System.out.println("Cannot find a visible node in both graphs");
 			return;
@@ -1398,7 +1397,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 	}
 
 	private void doTriangulate() {
-		final int[] array = new int[200];
+		final int[] currNodes = new int[200];
 		final int[] array2 = new int[200];
 		final int[][] array3 = new int[800][2];
 		final int[] array4 = new int[200];
@@ -1409,9 +1408,9 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		for (int i = 0; i < this.nc; ++i) {
 			array8[i][0] = i;
 			array8[i][1] = (i + 1) % this.nc;
-			array[i] = this.curNodes[i];
-			array6[i] = this.nodeX[this.curGraph][array[i]];
-			array7[i] = this.nodeY[this.curGraph][array[i]];
+			currNodes[i] = this.curNodes[i];
+			array6[i] = this.nodeX[this.curGraph][currNodes[i]];
+			array7[i] = this.nodeY[this.curGraph][currNodes[i]];
 			this.curNodes[i] = i;
 		}
 		final int triangulate = this.triangulate(this.curNodes, this.nc, array8, this.nc, array6, array7);
@@ -1419,8 +1418,8 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		for (int j = 0; j < this.nc; ++j) {
 			array3[j][0] = j;
 			array3[j][1] = (j + 1) % this.nc;
-			array4[j] = this.nodeX[n][array[j]];
-			array5[j] = this.nodeY[n][array[j]];
+			array4[j] = this.nodeX[n][currNodes[j]];
+			array5[j] = this.nodeY[n][currNodes[j]];
 			array2[j] = j;
 		}
 		final int triangulate2 = this.triangulate(array2, this.nc, array3, this.nc, array4, array5);
@@ -1428,7 +1427,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.findSteiner1(this.nc, array6, array7, this.nc, array4, array5, this.nc, array8, triangulate, array3, triangulate2, array9);
 		int n2 = this.curNode[this.curGraph];
 		for (int k = this.nc; k < array9[0]; ++k) {
-			array[k] = n2 + k - this.nc;
+			currNodes[k] = n2 + k - this.nc;
 		}
 		for (int l = this.nc; l < array9[0]; ++l) {
 			this.nodeX[this.curGraph][n2] = array6[l];
@@ -1440,13 +1439,13 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		this.curNode[this.curGraph] = n2;
 		this.curNode[n] = n2;
 		for (int nc = this.nc; nc < array9[1]; ++nc) {
-			this.link[this.curGraph][this.curLink[this.curGraph]][0] = array[array8[nc][0]];
-			this.link[this.curGraph][this.curLink[this.curGraph]][1] = array[array8[nc][1]];
+			this.link[this.curGraph][this.curLink[this.curGraph]][0] = currNodes[array8[nc][0]];
+			this.link[this.curGraph][this.curLink[this.curGraph]][1] = currNodes[array8[nc][1]];
 			final int[] curLink = this.curLink;
 			final int curGraph = this.curGraph;
 			++curLink[curGraph];
-			this.link[n][this.curLink[n]][0] = array[array3[nc][0]];
-			this.link[n][this.curLink[n]][1] = array[array3[nc][1]];
+			this.link[n][this.curLink[n]][0] = currNodes[array3[nc][0]];
+			this.link[n][this.curLink[n]][1] = currNodes[array3[nc][1]];
 			final int[] curLink2 = this.curLink;
 			final int n3 = n;
 			++curLink2[n3];
@@ -2097,7 +2096,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return false;
 	}
 
-	private void ConvexMotion(final Graphics graphics, final int n, final int n2) {
+	private void ConvexMotion(final Graphics graphics, final int currFrame, final int endFrame) {
 		final int n3 = this.curNode[0];
 		final Color[] array = new Color[this.curNode[0]];
 		final int n4 = this.bound.getSelectedIndex() + 3;
@@ -2107,8 +2106,8 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		final int[] array5 = new int[n3];
 		final int[] array6 = new int[n3];
 		final int[] array7 = new int[n3];
-		this.ConvexMotion1(graphics, array3, array4, n, n2);
-		final double n5 = n / (double) n2;
+		this.ConvexMotion1(graphics, array3, array4, currFrame, endFrame);
+		final double t = currFrame / (double) endFrame;
 		final int[] array8 = new int[n3 - n4];
 		int n6 = 0;
 		int n7 = 0;
@@ -2125,14 +2124,14 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 		for (int j = 0; j < n3 - n4; ++j) {
 			for (int k = 0; k < n3 - n4; ++k) {
-				array2[j][k] = (1.0 - n5) * this.lamda0[array8[j]][array8[k]] + n5 * this.lamda1[array8[j]][array8[k]];
+				array2[j][k] = (1.0 - t) * this.lamda0[array8[j]][array8[k]] + t * this.lamda1[array8[j]][array8[k]];
 				if (j == k) {
 					--array2[j][k];
 				}
 			}
 			double n9 = 0.0;
 			for (int l = 0; l < n4; ++l) {
-				n9 += ((1.0 - n5) * this.lamda0[array8[j]][array9[l]] + n5 * this.lamda1[array8[j]][array9[l]]) * array3[array9[l]];
+				n9 += ((1.0 - t) * this.lamda0[array8[j]][array9[l]] + t * this.lamda1[array8[j]][array9[l]]) * array3[array9[l]];
 			}
 			array2[j][n3 - n4] = -n9;
 		}
@@ -2142,14 +2141,14 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 		for (int n11 = 0; n11 < n3 - n4; ++n11) {
 			for (int n12 = 0; n12 < n3 - n4; ++n12) {
-				array2[n11][n12] = (1.0 - n5) * this.lamda0[array8[n11]][array8[n12]] + n5 * this.lamda1[array8[n11]][array8[n12]];
+				array2[n11][n12] = (1.0 - t) * this.lamda0[array8[n11]][array8[n12]] + t * this.lamda1[array8[n11]][array8[n12]];
 				if (n11 == n12) {
 					--array2[n11][n12];
 				}
 			}
 			double n13 = 0.0;
 			for (int n14 = 0; n14 < n4; ++n14) {
-				n13 += ((1.0 - n5) * this.lamda0[array8[n11]][array9[n14]] + n5 * this.lamda1[array8[n11]][array9[n14]])
+				n13 += ((1.0 - t) * this.lamda0[array8[n11]][array9[n14]] + t * this.lamda1[array8[n11]][array9[n14]])
 						* array4[array9[n14]];
 			}
 			array2[n11][n3 - n4] = -n13;
@@ -2173,8 +2172,8 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 			final int green = color.getGreen();
 			final int blue = color.getBlue();
 			final Color color2 = this.nodeColor[1][n18];
-			array[n18] = new Color(red + (color2.getRed() - red) * n / n2, green + (color2.getGreen() - green) * n / n2,
-					blue + (color2.getBlue() - blue) * n / n2);
+			array[n18] = new Color(red + (color2.getRed() - red) * currFrame / endFrame,
+					green + (color2.getGreen() - green) * currFrame / endFrame, blue + (color2.getBlue() - blue) * currFrame / endFrame);
 		}
 		this.drawAnimatedGraph(graphics, array5, array6, array);
 	}
@@ -2230,47 +2229,73 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	private int triangulate(final int[] array, int i, final int[][] array2, int n, final int[] array3, final int[] array4) {
-		int n2 = 0;
-		int left = 0;
-		int inside = 0;
-		while (i > 3) {
-			left = this.getLeft(array, i, array3, array4);
-			n2 = array[left];
-			final int n3 = array[(left + 1) % i];
-			final int n4 = array[(left - 1 + i) % i];
-			inside = this.inside(n3, n2, n4, array, i, array3, array4);
-			if (inside != -1) {
+	/**
+	 * Triangulates a polygon using the provided vertices and returns the number of
+	 * triangles created.
+	 * <p>
+	 * Each row in the <code>triangles</code> array represents a single triangle and
+	 * has two columns, each column representing the indices of the vertices of the
+	 * triangle in the nodes array. For example, if <code>triangles[i][0]</code> is
+	 * 5 and <code>triangles[i][1]</code> is 2, then the ith triangle created by the
+	 * triangulation is made up of the vertices represented by the 5th and 2nd
+	 * indices in the nodes array.
+	 * 
+	 * @param nodes             An array of integers representing the vertices of
+	 *                          the polygon.
+	 * @param numberOfNodes     An integer representing the number of vertices in
+	 *                          the polygon.
+	 * @param triangles         A 2D array of integers to hold the triangles created
+	 *                          by the triangulation.
+	 * @param numberOfTriangles An integer representing the number of triangles
+	 *                          currently in the array.
+	 * @param nodeX             An array of x-coordinates for the vertices of the
+	 *                          polygon.
+	 * @param nodeY             An array of y-coordinates for the vertices of the
+	 *                          polygon.
+	 * @return An integer representing the number of triangles created.
+	 */
+	private int triangulate(final int[] nodes, int numberOfNodes, final int[][] triangles, int numberOfTriangles, final int[] nodeX,
+			final int[] nodeY) {
+		int currentNode = 0;
+		int leftmostNode = 0;
+		int insideNode = 0;
+		while (numberOfNodes > 3) {
+			leftmostNode = this.getLeft(nodes, numberOfNodes, nodeX);
+			currentNode = nodes[leftmostNode];
+			final int nextNode = nodes[(leftmostNode + 1) % numberOfNodes];
+			final int prevNode = nodes[(leftmostNode - 1 + numberOfNodes) % numberOfNodes];
+			insideNode = this.inside(nextNode, currentNode, prevNode, nodes, numberOfNodes, nodeX, nodeY);
+			if (insideNode != -1) {
 				break;
 			}
-			--i;
-			for (int j = left; j < i; ++j) {
-				array[j] = array[j + 1];
+			--numberOfNodes;
+			for (int j = leftmostNode; j < numberOfNodes; ++j) {
+				nodes[j] = nodes[j + 1];
 			}
-			array2[n][0] = n3;
-			array2[n][1] = n4;
-			++n;
+			triangles[numberOfTriangles][0] = nextNode;
+			triangles[numberOfTriangles][1] = prevNode;
+			numberOfTriangles++;
 		}
-		if (i <= 3) {
-			return n;
+		if (numberOfNodes <= 3) {
+			return numberOfTriangles;
 		}
-		array2[n][0] = n2;
-		array2[n][1] = array[inside];
-		++n;
-		final int abs = Math.abs(left - inside);
-		final int n5 = i - abs;
-		final int[] array5 = new int[(abs > n5) ? (abs + 1) : (n5 + 1)];
-		final int n6 = (left > inside) ? inside : left;
-		for (int k = 0; k < abs + 1; ++k) {
-			array5[k] = array[k + n6];
+		triangles[numberOfTriangles][0] = currentNode;
+		triangles[numberOfTriangles][1] = nodes[insideNode];
+		numberOfTriangles++;
+		final int absoluteValue = Math.abs(leftmostNode - insideNode);
+		final int newNumberOfNodes = numberOfNodes - absoluteValue;
+		final int[] newNodes = new int[(absoluteValue > newNumberOfNodes) ? (absoluteValue + 1) : (newNumberOfNodes + 1)];
+		final int newLeftmostNode = (leftmostNode > insideNode) ? insideNode : leftmostNode;
+		for (int k = 0; k < absoluteValue + 1; ++k) {
+			newNodes[k] = nodes[k + newLeftmostNode];
 		}
-		n = this.triangulate(array5, abs + 1, array2, n, array3, array4);
-		final int n7 = (left > inside) ? left : inside;
-		for (int l = 0; l < n5 + 1; ++l) {
-			array5[l] = array[(l + n7) % i];
+		numberOfTriangles = this.triangulate(newNodes, absoluteValue + 1, triangles, numberOfTriangles, nodeX, nodeY);
+		final int newInsideNode = (leftmostNode > insideNode) ? leftmostNode : insideNode;
+		for (int l = 0; l < newNumberOfNodes + 1; ++l) {
+			newNodes[l] = nodes[(l + newInsideNode) % numberOfNodes];
 		}
-		n = this.triangulate(array5, n5 + 1, array2, n, array3, array4);
-		return n;
+		numberOfTriangles = this.triangulate(newNodes, newNumberOfNodes + 1, triangles, numberOfTriangles, nodeX, nodeY);
+		return numberOfTriangles;
 	}
 
 	private int inside(final int n, final int n2, final int n3, final int[] array, final int n4, final int[] array2, final int[] array3) {
@@ -2303,8 +2328,8 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return acos + acos2 + Math.acos((n13 * n15 + n14 * n16) / (Math.sqrt(n13 * n13 + n14 * n14) * Math.sqrt(n15 * n15 + n16 * n16)));
 	}
 
-	int getLeft(final int[] array, final int n, final int[] array2, final int[] array3) {
-		int n2 = 100000;
+	private int getLeft(final int[] array, final int n, final int[] array2) {
+		int n2 = Integer.MAX_VALUE;
 		int n3 = 0;
 		for (int i = 0; i < n; ++i) {
 			final int n4 = array[i];
