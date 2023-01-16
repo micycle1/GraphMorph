@@ -1956,47 +1956,48 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 	 */
 	private void calcFramesConvex() {
 		final int nodeCount = this.curNode[0];
-		final int n2 = this.bound.getSelectedIndex() + 3;
-		final double[] array = new double[200];
-		final double[] array2 = new double[200];
-		final double[] array3 = new double[200];
+		final int boundaryIndex = this.bound.getSelectedIndex() + 3;
+		final double[] angles0 = new double[nodeCount];
+		final double[] angles1 = new double[nodeCount];
+		final double[] array3 = new double[nodeCount];
 		for (int i = 0; i < nodeCount; ++i) {
-			int n3;
-			for (n3 = 0; n3 < n2 && this.borderNodes[n3] != i; ++n3) {
+			int borderNodeIndex;
+			for (borderNodeIndex = 0; borderNodeIndex < boundaryIndex && this.borderNodes[borderNodeIndex] != i; ++borderNodeIndex) {
 			}
-			if (n3 == n2) {
+			if (borderNodeIndex == boundaryIndex) {
 				double n7;
 				double n6 = n7 = 0.0;
-				int n8 = 0;
+				int adjNodeCount = 0;
 				for (int j = 0; j < nodeCount; ++j) {
 					if (this.isAdjacent(i, j)) {
 						array3[j] = Math.atan2(this.nodeX[0][j] - this.nodeX[0][i], this.nodeY[0][j] - this.nodeY[0][i]) + Math.PI;
-						n8++;
+						adjNodeCount++;
 					} else {
-						array3[j] = 1000.0;
+						array3[j] = Double.MAX_VALUE;
 					}
 				}
 				this.sort(array3, nodeCount);
-				for (int n9 = n8, k = 0; k < n9; ++k) {
+				for (int n9 = adjNodeCount, k = 0; k < n9; ++k) {
 					final int n10 = (int) array3[k];
 					final int n11 = (int) array3[(k - 1 + n9) % n9];
 					final int n12 = (int) array3[(k + 1) % n9];
-					final int n13 = this.nodeX[0][n10] - this.nodeX[0][i];
-					final int n14 = this.nodeY[0][n10] - this.nodeY[0][i];
-					array2[n10] = (Math
-							.tan(getAngle(n13, n14, this.nodeX[0][n11] - this.nodeX[0][i], this.nodeY[0][n11] - this.nodeY[0][i]) / 2.0)
+					final int xDiff = this.nodeX[0][n10] - this.nodeX[0][i];
+					final int yDiff = this.nodeY[0][n10] - this.nodeY[0][i];
+					angles0[n10] = (Math
+							.tan(getAngle(xDiff, yDiff, this.nodeX[0][n11] - this.nodeX[0][i], this.nodeY[0][n11] - this.nodeY[0][i]) / 2.0)
 							+ Math.tan(
-									getAngle(n13, n14, this.nodeX[0][n12] - this.nodeX[0][i], this.nodeY[0][n12] - this.nodeY[0][i]) / 2.0))
-							/ Math.sqrt(n13 * n13 + n14 * n14);
-					n7 += array2[n10];
+									getAngle(xDiff, yDiff, this.nodeX[0][n12] - this.nodeX[0][i], this.nodeY[0][n12] - this.nodeY[0][i]) / 2.0))
+							/ Math.sqrt(xDiff * xDiff + yDiff * yDiff);
+					n7 += angles0[n10];
 				}
+				
 				int n15 = 0;
 				for (int l = 0; l < nodeCount; ++l) {
 					if (this.isAdjacent(i, l)) {
 						array3[l] = Math.atan2(this.nodeX[1][l] - this.nodeX[1][i], this.nodeY[1][l] - this.nodeY[1][i]) + Math.PI;
 						++n15;
 					} else {
-						array3[l] = 1000.0;
+						array3[l] = Double.MAX_VALUE;
 					}
 				}
 				this.sort(array3, nodeCount);
@@ -2006,17 +2007,17 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 					final int n20 = (int) array3[(n17 + 1) % n16];
 					final int n21 = this.nodeX[1][n18] - this.nodeX[1][i];
 					final int n22 = this.nodeY[1][n18] - this.nodeY[1][i];
-					array[n18] = (Math
+					angles1[n18] = (Math
 							.tan(getAngle(n21, n22, this.nodeX[1][n19] - this.nodeX[1][i], this.nodeY[1][n19] - this.nodeY[1][i]) / 2.0)
 							+ Math.tan(
 									getAngle(n21, n22, this.nodeX[1][n20] - this.nodeX[1][i], this.nodeY[1][n20] - this.nodeY[1][i]) / 2.0))
 							/ Math.sqrt(n21 * n21 + n22 * n22);
-					n6 += array[n18];
+					n6 += angles1[n18];
 				}
 				for (int n23 = 0; n23 < nodeCount; ++n23) {
 					if (this.isAdjacent(i, n23)) {
-						this.lamda0[i][n23] = array2[n23] / n7;
-						this.lamda1[i][n23] = array[n23] / n6;
+						this.lamda0[i][n23] = angles0[n23] / n7;
+						this.lamda1[i][n23] = angles1[n23] / n6;
 					} else {
 						this.lamda0[i][n23] = (this.lamda1[i][n23] = 0.0);
 					}
