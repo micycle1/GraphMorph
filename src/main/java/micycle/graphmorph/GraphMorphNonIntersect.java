@@ -46,7 +46,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 	final int MAX_NODES = 200;
 	final int MAX_LINKS = 800;
 	final int MAX_BOUND = 100;
-	
+
 	Color background;
 	Font font12;
 	Font font12b;
@@ -1908,7 +1908,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return Math.acos((n * (double) n3 + n2 * n4) / Math.sqrt(n * (double) n + n2 * n2) / Math.sqrt(n3 * (double) n3 + n4 * n4));
 	}
 
-	private void gauss(final double[][] array, final int n, final int n2, final int[] array2, final int n3) {
+	private void gauss(final double[][] array, final int n, final int n2, final int[] array2) {
 		for (int i = 0; i < n - 1; ++i) {
 			for (int j = i + 1; j < n; ++j) {
 				this.rowManipulate(array[j], array[i], array[j][i] / array[i][i], n2);
@@ -1923,10 +1923,19 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		}
 	}
 
-	private void rowManipulate(final double[] array, final double[] array2, final double n, final int n2) {
-		for (int i = 0; i < n2; ++i) {
-			final int n3 = i;
-			array[n3] -= array2[i] * n;
+	/**
+	 * This method is used to manipulate a row of a 2D array by performing a scalar
+	 * multiplication with another row and adding the result to itself. It is used
+	 * in the Gaussian elimination method to reduce a matrix to row echelon form.
+	 * 
+	 * @param row1   The row that will be modified.
+	 * @param row2   The row that will be used to perform the scalar multiplication.
+	 * @param scalar The scalar value to multiply with the second row.
+	 * @param n      The number of columns in the 2D array.
+	 */
+	private void rowManipulate(double[] rowToManipulate, double[] referenceRow, double scalar, int columnCount) {
+		for (int i = 0; i < columnCount; i++) {
+			rowToManipulate[i] -= referenceRow[i] * scalar;
 		}
 	}
 
@@ -2110,85 +2119,88 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 	}
 
 	private void ConvexMotion(final Graphics graphics, final int currFrame, final int endFrame) {
-		final int n3 = this.curNode[0];
-		final Color[] array = new Color[this.curNode[0]];
-		final int n4 = this.bound.getSelectedIndex() + 3;
+		final int nodeCount = this.curNode[0];
+		final Color[] nodeColors = new Color[this.curNode[0]];
+		final int boundaryNodeCount = this.bound.getSelectedIndex() + 3;
 		final double[][] array2 = new double[this.curNode[0]][this.curNode[0]];
-		final double[] array3 = new double[n3];
-		final double[] array4 = new double[n3];
-		final int[] array5 = new int[n3];
-		final int[] array6 = new int[n3];
-		final int[] array7 = new int[n3];
+		final double[] array3 = new double[nodeCount];
+		final double[] array4 = new double[nodeCount];
+		final int[] array5 = new int[nodeCount];
+		final int[] array6 = new int[nodeCount];
+		final int[] array7 = new int[nodeCount];
+
 		this.ConvexMotion1(graphics, array3, array4, currFrame, endFrame);
+
 		final double t = currFrame / (double) endFrame;
-		final int[] array8 = new int[n3 - n4];
+		final int[] array8 = new int[nodeCount - boundaryNodeCount];
 		int n6 = 0;
 		int n7 = 0;
-		final int[] array9 = new int[n4];
-		for (int i = 0; i < n3; ++i) {
-			int n8;
-			for (n8 = 0; n8 < n4 && this.borderNodes[n8] != i; ++n8) {
+		final int[] array9 = new int[boundaryNodeCount];
+		for (int i = 0; i < nodeCount; ++i) {
+			int boundaryNodeIndex;
+			for (boundaryNodeIndex = 0; boundaryNodeIndex < boundaryNodeCount
+					&& this.borderNodes[boundaryNodeIndex] != i; boundaryNodeIndex++) {
 			}
-			if (n8 != n4) {
+			if (boundaryNodeIndex != boundaryNodeCount) {
 				array9[n7++] = i;
 			} else {
 				array8[n6++] = i;
 			}
 		}
-		for (int j = 0; j < n3 - n4; ++j) {
-			for (int k = 0; k < n3 - n4; ++k) {
+		for (int j = 0; j < nodeCount - boundaryNodeCount; ++j) {
+			for (int k = 0; k < nodeCount - boundaryNodeCount; ++k) {
 				array2[j][k] = (1.0 - t) * this.lamda0[array8[j]][array8[k]] + t * this.lamda1[array8[j]][array8[k]];
 				if (j == k) {
 					--array2[j][k];
 				}
 			}
 			double n9 = 0.0;
-			for (int l = 0; l < n4; ++l) {
+			for (int l = 0; l < boundaryNodeCount; ++l) {
 				n9 += ((1.0 - t) * this.lamda0[array8[j]][array9[l]] + t * this.lamda1[array8[j]][array9[l]]) * array3[array9[l]];
 			}
-			array2[j][n3 - n4] = -n9;
+			array2[j][nodeCount - boundaryNodeCount] = -n9;
 		}
-		this.gauss(array2, n3 - n4, n3 - n4 + 1, array7, n4);
-		for (int n10 = 0; n10 < n3 - n4; ++n10) {
+		this.gauss(array2, nodeCount - boundaryNodeCount, nodeCount - boundaryNodeCount + 1, array7);
+		for (int n10 = 0; n10 < nodeCount - boundaryNodeCount; ++n10) {
 			array5[array8[n10]] = array7[n10];
 		}
-		for (int n11 = 0; n11 < n3 - n4; ++n11) {
-			for (int n12 = 0; n12 < n3 - n4; ++n12) {
+		for (int n11 = 0; n11 < nodeCount - boundaryNodeCount; ++n11) {
+			for (int n12 = 0; n12 < nodeCount - boundaryNodeCount; ++n12) {
 				array2[n11][n12] = (1.0 - t) * this.lamda0[array8[n11]][array8[n12]] + t * this.lamda1[array8[n11]][array8[n12]];
 				if (n11 == n12) {
 					--array2[n11][n12];
 				}
 			}
 			double n13 = 0.0;
-			for (int n14 = 0; n14 < n4; ++n14) {
+			for (int n14 = 0; n14 < boundaryNodeCount; ++n14) {
 				n13 += ((1.0 - t) * this.lamda0[array8[n11]][array9[n14]] + t * this.lamda1[array8[n11]][array9[n14]])
 						* array4[array9[n14]];
 			}
-			array2[n11][n3 - n4] = -n13;
+			array2[n11][nodeCount - boundaryNodeCount] = -n13;
 		}
-		this.gauss(array2, n3 - n4, n3 - n4 + 1, array7, n4);
-		for (int n15 = 0; n15 < n3 - n4; ++n15) {
+		this.gauss(array2, nodeCount - boundaryNodeCount, nodeCount - boundaryNodeCount + 1, array7);
+		for (int n15 = 0; n15 < nodeCount - boundaryNodeCount; ++n15) {
 			array6[array8[n15]] = array7[n15];
 		}
-		for (int n16 = 0; n16 < n3; ++n16) {
+		for (int n16 = 0; n16 < nodeCount; ++n16) {
 			int n17;
-			for (n17 = 0; n17 < n4 && this.borderNodes[n17] != n16; ++n17) {
+			for (n17 = 0; n17 < boundaryNodeCount && this.borderNodes[n17] != n16; ++n17) {
 			}
-			if (n17 != n4) {
+			if (n17 != boundaryNodeCount) {
 				array5[n16] = (int) array3[n16];
 				array6[n16] = (int) array4[n16];
 			}
 		}
-		for (int n18 = 0; n18 < n3; ++n18) {
+		for (int n18 = 0; n18 < nodeCount; ++n18) {
 			final Color color = this.nodeColor[0][n18];
 			final int red = color.getRed();
 			final int green = color.getGreen();
 			final int blue = color.getBlue();
 			final Color color2 = this.nodeColor[1][n18];
-			array[n18] = new Color(red + (color2.getRed() - red) * currFrame / endFrame,
+			nodeColors[n18] = new Color(red + (color2.getRed() - red) * currFrame / endFrame,
 					green + (color2.getGreen() - green) * currFrame / endFrame, blue + (color2.getBlue() - blue) * currFrame / endFrame);
 		}
-		this.drawAnimatedGraph(graphics, array5, array6, array);
+		this.drawAnimatedGraph(graphics, array5, array6, nodeColors);
 	}
 
 	private void ConvexMotion1(final Graphics graphics, final double[] array, final double[] array2, final int n, final int n2) {
