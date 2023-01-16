@@ -2260,11 +2260,11 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		int leftmostNode = 0;
 		int insideNode = 0;
 		while (numberOfNodes > 3) {
-			leftmostNode = this.getLeft(nodes, numberOfNodes, nodeX);
+			leftmostNode = this.getLeftMostVertexIndex(nodes, numberOfNodes, nodeX);
 			currentNode = nodes[leftmostNode];
 			final int nextNode = nodes[(leftmostNode + 1) % numberOfNodes];
 			final int prevNode = nodes[(leftmostNode - 1 + numberOfNodes) % numberOfNodes];
-			insideNode = this.inside(nextNode, currentNode, prevNode, nodes, numberOfNodes, nodeX, nodeY);
+			insideNode = this.getInsideVertex(nextNode, currentNode, prevNode, nodes, numberOfNodes, nodeX, nodeY);
 			if (insideNode != -1) {
 				break;
 			}
@@ -2298,16 +2298,38 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return numberOfTriangles;
 	}
 
-	private int inside(final int n, final int n2, final int n3, final int[] array, final int n4, final int[] array2, final int[] array3) {
-		int n5 = 10000;
-		int n6 = -1;
-		for (int i = 0; i < n4; ++i) {
-			if (getAngle1(n, n2, n3, array[i], array2, array3) == (Math.PI * 2) && n5 > array2[i]) {
-				n5 = array2[i];
-				n6 = i;
+	/**
+	 * Finds the index of a vertex inside a triangle formed by three other vertices.
+	 * 
+	 * @param vertex1          Index of the first vertex of the triangle in the
+	 *                         vertices array.
+	 * @param vertex2          Index of the second vertex of the triangle in the
+	 *                         vertices array.
+	 * @param vertex3          Index of the third vertex of the triangle in the
+	 *                         vertices array.
+	 * @param vertices         An array of integers representing the vertices of the
+	 *                         polygon.
+	 * @param numberOfVertices An integer representing the number of vertices in the
+	 *                         polygon.
+	 * @param xCoordinates     An array of integers representing the x-coordinates
+	 *                         of the vertices.
+	 * @param yCoordinates     An array of integers representing the y-coordinates
+	 *                         of the vertices.
+	 * @return An integer representing the index of the vertex inside the triangle
+	 *         in the vertices array.
+	 */
+	private int getInsideVertex(final int vertex1, final int vertex2, final int vertex3, final int[] vertices, final int numberOfVertices,
+			final int[] xCoordinates, final int[] yCoordinates) {
+		int smallestX = Integer.MAX_VALUE;
+		int insideVertex = -1;
+		for (int i = 0; i < numberOfVertices; ++i) {
+			if (getAngle1(vertex1, vertex2, vertex3, vertices[i], xCoordinates, yCoordinates) == (Math.PI * 2)
+					&& smallestX > xCoordinates[i]) {
+				smallestX = xCoordinates[i];
+				insideVertex = i;
 			}
 		}
-		return n6;
+		return insideVertex;
 	}
 
 	private static double getAngle1(final int n, final int n2, final int n3, final int n4, final int[] array, final int[] array2) {
@@ -2328,17 +2350,29 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return acos + acos2 + Math.acos((n13 * n15 + n14 * n16) / (Math.sqrt(n13 * n13 + n14 * n14) * Math.sqrt(n15 * n15 + n16 * n16)));
 	}
 
-	private int getLeft(final int[] array, final int n, final int[] array2) {
-		int n2 = Integer.MAX_VALUE;
-		int n3 = 0;
-		for (int i = 0; i < n; ++i) {
-			final int n4 = array[i];
-			if (array2[n4] < n2) {
-				n2 = array2[n4];
-				n3 = i;
+	/**
+	 * Finds the index of the leftmost vertex in a polygon.
+	 * 
+	 * @param vertices         An array of integers representing the vertices of the
+	 *                         polygon.
+	 * @param numberOfVertices An integer representing the number of vertices in the
+	 *                         polygon.
+	 * @param xCoordinates     An array of integers representing the x-coordinates
+	 *                         of the vertices.
+	 * @return An integer representing the index of the leftmost vertex in the
+	 *         vertices array.
+	 */
+	private int getLeftMostVertexIndex(final int[] vertices, final int numberOfVertices, final int[] xCoordinates) {
+		int smallestXCoordinate = Integer.MAX_VALUE;
+		int leftmostVertexIndex = 0;
+		for (int i = 0; i < numberOfVertices; ++i) {
+			final int currentVertex = vertices[i];
+			if (xCoordinates[currentVertex] < smallestXCoordinate) {
+				smallestXCoordinate = xCoordinates[currentVertex];
+				leftmostVertexIndex = i;
 			}
 		}
-		return n3;
+		return leftmostVertexIndex;
 	}
 
 	private void findSteiner1(final int n, final int[] array, final int[] array2, int n2, final int[] array3, final int[] array4, int n3,
