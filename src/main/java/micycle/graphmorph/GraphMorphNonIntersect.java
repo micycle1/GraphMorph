@@ -40,10 +40,13 @@ import java.io.FileWriter;
  */
 class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotionListener, AdjustmentListener, ItemListener, ActionListener {
 
+	private static final double TWO_PI = Math.PI * 2;
+
 	final int SIZE = 20;
 	final int MAX_NODES = 200;
 	final int MAX_LINKS = 800;
 	final int MAX_BOUND = 100;
+	
 	Color background;
 	Font font12;
 	Font font12b;
@@ -432,8 +435,9 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		graphics2D.setColor(Color.black);
 		graphics2D.setStroke(new BasicStroke(2.0f));
 		for (int n4 = 0; n4 < this.edgeCount[curGraph]; ++n4) {
-			graphics2D.drawLine(this.nodeX[curGraph][this.links[curGraph][n4][0]] + n, this.nodeY[curGraph][this.links[curGraph][n4][0]] + n,
-					this.nodeX[curGraph][this.links[curGraph][n4][1]] + n, this.nodeY[curGraph][this.links[curGraph][n4][1]] + n);
+			graphics2D.drawLine(this.nodeX[curGraph][this.links[curGraph][n4][0]] + n,
+					this.nodeY[curGraph][this.links[curGraph][n4][0]] + n, this.nodeX[curGraph][this.links[curGraph][n4][1]] + n,
+					this.nodeY[curGraph][this.links[curGraph][n4][1]] + n);
 		}
 		if (this.showSteiner.getState()) {
 			graphics2D.setStroke(new BasicStroke(1.0f));
@@ -1143,7 +1147,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 					for (int l = 0; l < array5[n8]; ++l) {
 						double n12;
 						for (n12 = Math.atan2(array2[n8] - array2[array4[n8][l]], array[n8] - array[array4[n8][l]])
-								- atan2; n12 < 0.0; n12 += (Math.PI * 2)) {
+								- atan2; n12 < 0.0; n12 += TWO_PI) {
 						}
 						if (n12 < n10) {
 							if (nc > 1) {
@@ -1985,12 +1989,12 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 					final int yDiff = this.nodeY[0][n10] - this.nodeY[0][i];
 					angles0[n10] = (Math
 							.tan(getAngle(xDiff, yDiff, this.nodeX[0][n11] - this.nodeX[0][i], this.nodeY[0][n11] - this.nodeY[0][i]) / 2.0)
-							+ Math.tan(
-									getAngle(xDiff, yDiff, this.nodeX[0][n12] - this.nodeX[0][i], this.nodeY[0][n12] - this.nodeY[0][i]) / 2.0))
+							+ Math.tan(getAngle(xDiff, yDiff, this.nodeX[0][n12] - this.nodeX[0][i], this.nodeY[0][n12] - this.nodeY[0][i])
+									/ 2.0))
 							/ Math.sqrt(xDiff * xDiff + yDiff * yDiff);
 					n7 += angles0[n10];
 				}
-				
+
 				int n15 = 0;
 				for (int l = 0; l < nodeCount; ++l) {
 					if (this.isAdjacent(i, l)) {
@@ -2028,82 +2032,82 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 	}
 
 	private void calcFramesConvex1() {
-		final double n = 0.0;
-		this.uY1 = n;
-		this.uX1 = n;
-		this.uY0 = n;
-		this.uX0 = n;
-		final int n2 = this.bound.getSelectedIndex() + 3;
-		final int n3 = this.curNode[0];
-		final int[] array = new int[n3];
-		int n4 = 0;
-		for (int i = 0; i < n3; ++i) {
-			int n5;
-			for (n5 = 0; n5 < n2 && this.borderNodes[n5] != i; ++n5) {
+		double initialValue = 0.0;
+		this.uY1 = initialValue;
+		this.uX1 = initialValue;
+		this.uY0 = initialValue;
+		this.uX0 = initialValue;
+		int borderIndex = this.bound.getSelectedIndex() + 3;
+		int nodeCount = this.curNode[0];
+		int[] borderNodeArray = new int[nodeCount];
+		int borderNodeCount = 0;
+		for (int i = 0; i < nodeCount; ++i) {
+			int borderNodeIndex;
+			for (borderNodeIndex = 0; borderNodeIndex < borderIndex && this.borderNodes[borderNodeIndex] != i; ++borderNodeIndex) {
 			}
-			if (n5 != n2) {
+			if (borderNodeIndex != borderIndex) {
 				this.uX0 += this.nodeX[0][i];
 				this.uX1 += this.nodeX[1][i];
 				this.uY0 += this.nodeY[0][i];
 				this.uY1 += this.nodeY[1][i];
 			}
 		}
-		this.uX0 /= n2;
-		this.uY0 /= n2;
-		this.uX1 /= n2;
-		this.uY1 /= n2;
-		for (int j = 0; j < n3; ++j) {
-			int n6;
-			for (n6 = 0; n6 < n2 && this.borderNodes[n6] != j; ++n6) {
+		this.uX0 /= borderIndex;
+		this.uY0 /= borderIndex;
+		this.uX1 /= borderIndex;
+		this.uY1 /= borderIndex;
+		for (int j = 0; j < nodeCount; ++j) {
+			int borderNodeIndex;
+			for (borderNodeIndex = 0; borderNodeIndex < borderIndex && this.borderNodes[borderNodeIndex] != j; ++borderNodeIndex) {
 			}
-			if (n6 != n2) {
-				final double x = this.nodeX[0][j] - this.uX0;
-				final double y = this.nodeY[0][j] - this.uY0;
-				final double x2 = this.nodeX[1][j] - this.uX1;
-				final double y2 = this.nodeY[1][j] - this.uY1;
+			if (borderNodeIndex != borderIndex) {
+				double x = this.nodeX[0][j] - this.uX0;
+				double y = this.nodeY[0][j] - this.uY0;
+				double x2 = this.nodeX[1][j] - this.uX1;
+				double y2 = this.nodeY[1][j] - this.uY1;
 				this.rad[0][j] = Math.sqrt(x * x + y * y);
 				this.rad[1][j] = Math.sqrt(x2 * x2 + y2 * y2);
 				this.theta[0][j] = Math.atan2(y, x);
 				this.theta[1][j] = Math.atan2(y2, x2);
-				if (n4 == 0) {
+				if (borderNodeCount == 0) {
 					if (this.theta[0][j] < 0.0) {
-						this.theta[0][j] += (Math.PI * 2);
+						this.theta[0][j] += TWO_PI;
 					}
 				} else {
-					while (this.theta[0][j] < this.theta[0][array[n4 - 1]]) {
-						this.theta[0][j] += (Math.PI * 2);
+					while (this.theta[0][j] < this.theta[0][borderNodeArray[borderNodeCount - 1]]) {
+						this.theta[0][j] += TWO_PI;
 					}
 				}
-				if (n4 == 0) {
+				if (borderNodeCount == 0) {
 					if (this.theta[1][j] < 0.0) {
-						this.theta[1][j] += (Math.PI * 2);
+						this.theta[1][j] += TWO_PI;
 					}
 				} else {
-					while (this.theta[1][j] < this.theta[1][array[n4 - 1]]) {
-						this.theta[1][j] += (Math.PI * 2);
+					while (this.theta[1][j] < this.theta[1][borderNodeArray[borderNodeCount - 1]]) {
+						this.theta[1][j] += TWO_PI;
 					}
 				}
-				array[n4++] = j;
+				borderNodeArray[borderNodeCount++] = j;
 			}
 		}
 	}
 
-    /**
-     * Check if there is an edge between two nodes in the current graph
-     *
-     * @param node1 the first node
-     * @param node2 the second node
-     * @return true if there is an edge between the two nodes, false otherwise
-     */
-    private boolean isAdjacent(final int node1, final int node2) {
-        for (int i = 0; i < this.currentLinkCount[0]; ++i) {
-            if ((this.links[0][i][0] == node1 && this.links[0][i][1] == node2) || (this.links[0][i][0] == node2 && this.links[0][i][1] == node1)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
+	/**
+	 * Check if there is an edge between two nodes in the current graph
+	 *
+	 * @param node1 the first node
+	 * @param node2 the second node
+	 * @return true if there is an edge between the two nodes, false otherwise
+	 */
+	private boolean isAdjacent(final int node1, final int node2) {
+		for (int i = 0; i < this.currentLinkCount[0]; ++i) {
+			if ((this.links[0][i][0] == node1 && this.links[0][i][1] == node2)
+					|| (this.links[0][i][0] == node2 && this.links[0][i][1] == node1)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	private void ConvexMotion(final Graphics graphics, final int currFrame, final int endFrame) {
 		final int n3 = this.curNode[0];
@@ -2332,8 +2336,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		int smallestX = Integer.MAX_VALUE;
 		int insideVertex = -1;
 		for (int i = 0; i < numberOfVertices; ++i) {
-			if (getAngle(vertex1, vertex2, vertex3, vertices[i], xCoordinates, yCoordinates) == (Math.PI * 2)
-					&& smallestX > xCoordinates[i]) {
+			if (getAngle(vertex1, vertex2, vertex3, vertices[i], xCoordinates, yCoordinates) == TWO_PI && smallestX > xCoordinates[i]) {
 				smallestX = xCoordinates[i];
 				insideVertex = i;
 			}
@@ -2409,8 +2412,8 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		final int[] array10 = new int[n * n];
 		int n7 = n;
 		for (int i = 0; i < n; ++i) {
-			array10[i] = (int) (200.0 * Math.cos(i * Math.PI * 2.0 / n) + 250.0);
-			array9[i] = (int) (200.0 * Math.sin(i * Math.PI * 2.0 / n) + 250.0);
+			array10[i] = (int) (200.0 * Math.cos(i * TWO_PI / n) + 250.0);
+			array9[i] = (int) (200.0 * Math.sin(i * TWO_PI / n) + 250.0);
 			array8[i][0] = i;
 			array8[i][1] = (i + 1) % n;
 		}
