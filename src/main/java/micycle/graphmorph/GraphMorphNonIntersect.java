@@ -2323,7 +2323,7 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		int smallestX = Integer.MAX_VALUE;
 		int insideVertex = -1;
 		for (int i = 0; i < numberOfVertices; ++i) {
-			if (getAngle1(vertex1, vertex2, vertex3, vertices[i], xCoordinates, yCoordinates) == (Math.PI * 2)
+			if (getAngle(vertex1, vertex2, vertex3, vertices[i], xCoordinates, yCoordinates) == (Math.PI * 2)
 					&& smallestX > xCoordinates[i]) {
 				smallestX = xCoordinates[i];
 				insideVertex = i;
@@ -2332,22 +2332,39 @@ class GraphMorphNonIntersect extends Panel implements MouseListener, MouseMotion
 		return insideVertex;
 	}
 
-	private static double getAngle1(final int n, final int n2, final int n3, final int n4, final int[] array, final int[] array2) {
-		final int n5 = array[n2] - array[n4];
-		final int n6 = array2[n2] - array2[n4];
-		final int n7 = array[n3] - array[n4];
-		final int n8 = array2[n3] - array2[n4];
-		final double acos = Math.acos((n5 * n7 + n6 * n8) / (Math.sqrt(n5 * n5 + n6 * n6) * Math.sqrt(n7 * n7 + n8 * n8)));
-		final int n9 = array[n3] - array[n4];
-		final int n10 = array2[n3] - array2[n4];
-		final int n11 = array[n] - array[n4];
-		final int n12 = array2[n] - array2[n4];
-		final double acos2 = Math.acos((n9 * n11 + n10 * n12) / (Math.sqrt(n9 * n9 + n10 * n10) * Math.sqrt(n11 * n11 + n12 * n12)));
-		final int n13 = array[n] - array[n4];
-		final int n14 = array2[n] - array2[n4];
-		final int n15 = array[n2] - array[n4];
-		final int n16 = array2[n2] - array2[n4];
-		return acos + acos2 + Math.acos((n13 * n15 + n14 * n16) / (Math.sqrt(n13 * n13 + n14 * n14) * Math.sqrt(n15 * n15 + n16 * n16)));
+	/**
+	 * Calculates the angle between four vertices in a polygon.
+	 * 
+	 * @param vertex1      Index of the first vertex in the vertices array.
+	 * @param vertex2      Index of the second vertex in the vertices array.
+	 * @param vertex3      Index of the third vertex in the vertices array.
+	 * @param vertex4      Index of the fourth vertex in the vertices array.
+	 * @param xCoordinates An array of integers representing the x-coordinates of
+	 *                     the vertices.
+	 * @param yCoordinates An array of integers representing the y-coordinates of
+	 *                     the vertices.
+	 * @return A double representing the angle between the four vertices.
+	 */
+	private static double getAngle(final int vertex1, final int vertex2, final int vertex3, final int vertex4, final int[] xCoordinates,
+			final int[] yCoordinates) {
+		final int xDiff24 = xCoordinates[vertex2] - xCoordinates[vertex4];
+		final int yDiff24 = yCoordinates[vertex2] - yCoordinates[vertex4];
+		final int xDiff34 = xCoordinates[vertex3] - xCoordinates[vertex4];
+		final int yDiff34 = yCoordinates[vertex3] - yCoordinates[vertex4];
+		final double acos1 = Math.acos((xDiff24 * xDiff34 + yDiff24 * yDiff34)
+				/ (Math.sqrt(xDiff24 * xDiff24 + yDiff24 * yDiff24) * Math.sqrt(xDiff34 * xDiff34 + yDiff34 * yDiff34)));
+
+		final int xDiff23 = xCoordinates[vertex3] - xCoordinates[vertex4];
+		final int yDiff23 = yCoordinates[vertex3] - yCoordinates[vertex4];
+		final int xDiff14 = xCoordinates[vertex1] - xCoordinates[vertex4];
+		final int yDiff14 = yCoordinates[vertex1] - yCoordinates[vertex4];
+		final double acos2 = Math.acos((xDiff23 * xDiff14 + yDiff23 * yDiff14)
+				/ (Math.sqrt(xDiff23 * xDiff23 + yDiff23 * yDiff23) * Math.sqrt(xDiff14 * xDiff14 + yDiff14 * yDiff14)));
+
+		final double acos3 = Math.acos((xDiff14 * xDiff24 + yDiff14 * yDiff24)
+				/ (Math.sqrt(xDiff14 * xDiff14 + yDiff14 * yDiff14) * Math.sqrt(xDiff24 * xDiff24 + yDiff24 * yDiff24)));
+
+		return acos1 + acos2 + acos3;
 	}
 
 	/**
